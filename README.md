@@ -53,13 +53,35 @@ Default admin accounts are pre-created (Password is case-sensitive):
 - **Email**: `admin@store.com`
   - **Password**: `admin123`
 
-## How to Go Live (Deployment)
+## 🚀 How to Go Live on GitHub (Important!)
 
-To make this website live on the internet (e.g., Google Cloud, Heroku, Vercel, Render):
+GitHub itself only hosts **Static** websites (HTML/CSS). Since this project uses a **Database** and a **Backend Server**, you cannot just upload it to GitHub Pages.
 
-1.  **Database**: For a production site with high traffic, consider switching from SQLite to PostgreSQL or MySQL.
-2.  **Hosting**: Upload this code to a hosting provider.
-3.  **Docker**: A `Dockerfile` is included if you want to deploy using containers (e.g., Google Cloud Run).
+However, you can use **Render** (which connects to your GitHub) to host the full website for free.
+
+### Step 1: Push Code to GitHub
+1.  Create a new repository on [GitHub.com](https://github.com/new).
+2.  Run these commands in your terminal (replace `YOUR_REPO_URL` with the one from GitHub):
+    ```bash
+    git remote add origin YOUR_REPO_URL
+    git branch -M main
+    git push -u origin main
+    ```
+
+### Step 2: Deploy to Render (Free)
+1.  Go to [Render.com](https://render.com) and sign up with GitHub.
+2.  Click **New +** -> **Web Service**.
+3.  Select your `clothes-website` repository from the list.
+4.  Settings:
+    - **Name**: `clothes-website`
+    - **Environment**: `Node`
+    - **Build Command**: `npm install`
+    - **Start Command**: `node server.js`
+5.  Click **Create Web Service**.
+
+**That's it!** Render will give you a link (e.g., `https://clothes-website.onrender.com`).
+- The database will be created automatically.
+- **Note**: On the free plan, the database will reset if the server restarts (ephemeral storage). For a permanent database, you would need a cloud database (like Neon or Turso), but for a demo, this works perfectly.
 
 ## File Structure
 
