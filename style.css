@@ -1,0 +1,694 @@
+/* ===== Global Reset ===== */
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    font-family: 'Poppins', sans-serif;
+}
+
+body {
+    background: #1a1a1a;
+    color: white;
+    min-height: 100vh;
+    position: relative;
+    overflow-x: hidden;
+}
+
+a {
+    text-decoration: none;
+    color: white;
+    transition: color 0.3s ease;
+}
+
+
+/* ===== Header ===== */
+
+header {
+    background: rgba(17, 17, 17, 0.95);
+    backdrop-filter: blur(10px);
+    color: white;
+    padding: 15px 40px;
+    display: flex;
+    justify-content: flex-start;
+    align-items: center;
+    position: sticky;
+    top: 0;
+    z-index: 1000;
+    box-shadow: 0 3px 20px rgba(0, 0, 0, 0.5);
+    transition: all 0.3s ease;
+}
+
+header .social-icons {
+    display: flex;
+    gap: 15px;
+    font-size: 20px;
+    align-items: center;
+    margin-right: 20px;
+}
+
+header .social-icons a {
+    color: white;
+    transition: transform 0.3s, color 0.3s;
+}
+
+header .social-icons a:hover {
+    color: #ff66b2;
+    transform: translateY(-3px);
+}
+
+#backArrow {
+    cursor: pointer;
+    font-size: 24px;
+    color: #ff66b2;
+    margin-right: 15px;
+    transition: transform 0.3s;
+}
+
+#backArrow:hover {
+    transform: translateX(-5px);
+}
+
+header h2 {
+    font-size: 28px;
+    font-weight: 700;
+    cursor: pointer;
+    color: #ff66b2;
+    margin-left: 0;
+    letter-spacing: 1px;
+}
+
+header .apps {
+    cursor: pointer;
+    font-size: 24px;
+    margin-left: 15px;
+    transition: transform 0.3s;
+}
+
+header .apps:hover {
+    transform: scale(1.1);
+}
+
+header .menu {
+    position: relative;
+    cursor: pointer;
+    font-size: 24px;
+    font-weight: 700;
+    margin-left: 15px;
+}
+
+header .dropdown {
+    display: none;
+    position: absolute;
+    top: 45px;
+    right: 0;
+    background: #222;
+    color: white;
+    border-radius: 8px;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
+    overflow: hidden;
+    animation: fadeIn 0.3s ease;
+    z-index: 1001;
+}
+
+header .dropdown button {
+    width: 150px;
+    padding: 12px 15px;
+    border: none;
+    background: none;
+    text-align: left;
+    cursor: pointer;
+    transition: 0.3s;
+    color: white;
+    font-size: 14px;
+}
+
+header .dropdown button:hover {
+    background: #ff66b2;
+    color: white;
+    padding-left: 20px;
+}
+
+
+/* ===== Banner ===== */
+
+#banner {
+    width: 100%;
+    height: 400px;
+    background: linear-gradient(rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 0.5)), url('https://via.placeholder.com/1200x350/111/ff66b2?text=Ladies+Suits+Collection') center/cover no-repeat;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 50px;
+    font-weight: 800;
+    text-shadow: 0 0 20px #ff66b2;
+    letter-spacing: 2px;
+    animation: slideDown 0.8s ease-out;
+}
+
+
+/* ===== Sections ===== */
+
+section {
+    display: block;
+    padding: 40px;
+    max-width: 1200px;
+    margin: 0 auto;
+    animation: fadeIn 0.5s ease-out;
+}
+
+.products {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 30px;
+    margin-bottom: 80px;
+}
+
+.card {
+    background: #222;
+    border-radius: 15px;
+    overflow: hidden;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    position: relative;
+}
+
+.card:hover {
+    transform: translateY(-10px);
+    box-shadow: 0 15px 30px rgba(255, 102, 178, 0.3);
+}
+
+.card img {
+    width: 100%;
+    height: 300px;
+    object-fit: cover;
+    transition: 0.5s;
+    border-bottom: 2px solid #ff66b2;
+}
+
+.card:hover img {
+    transform: scale(1.1);
+}
+
+.card h3 {
+    font-size: 22px;
+    margin: 15px 20px 5px;
+    color: #ff66b2;
+}
+
+.card p {
+    font-size: 16px;
+    margin: 0 20px 10px;
+    font-weight: 500;
+    color: #ff99cc;
+}
+
+.card button {
+    margin: 10px 20px 20px;
+    padding: 12px;
+    background: #ff66b2;
+    border: none;
+    color: white;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: 0.3s;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.card button:hover {
+    background: #e62b9b;
+    box-shadow: 0 0 15px #ff66b2;
+    transform: scale(1.02);
+}
+
+.quick-view-btn {
+    position: absolute;
+    top: 15px;
+    right: 15px;
+    padding: 8px 12px;
+    background: rgba(17, 17, 17, 0.8);
+    backdrop-filter: blur(4px);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    opacity: 0;
+    transform: translateY(-10px);
+    transition: all 0.3s;
+}
+
+.card:hover .quick-view-btn {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.quick-view-btn:hover {
+    background: #ff66b2;
+}
+
+
+/* ===== Product Detail & Slider ===== */
+
+#detail {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+#detail img#mainImage {
+    width: 100%;
+    max-width: 500px;
+    border-radius: 15px;
+    margin-bottom: 20px;
+    display: block;
+    box-shadow: 0 5px 25px rgba(0, 0, 0, 0.5);
+    transition: transform 0.3s;
+}
+
+#detail img#mainImage:hover {
+    transform: scale(1.02);
+}
+
+.slider {
+    display: flex;
+    overflow-x: auto;
+    gap: 15px;
+    margin-bottom: 25px;
+    padding: 10px;
+}
+
+.slider img {
+    width: 100px;
+    height: 100px;
+    object-fit: cover;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: all 0.3s;
+    border: 2px solid transparent;
+}
+
+.slider img:hover {
+    transform: scale(1.1);
+}
+
+.slider img.selected {
+    border: 3px solid #ff66b2;
+    transform: scale(1.05);
+}
+
+
+/* ===== Auth Forms ===== */
+
+.auth {
+    max-width: 400px;
+    margin: 60px auto;
+    background: #222;
+    padding: 40px;
+    border-radius: 20px;
+    box-shadow: 0 10px 40px rgba(255, 102, 178, 0.2);
+    text-align: center;
+    animation: zoomIn 0.4s ease;
+}
+
+.auth h2 {
+    font-size: 32px;
+    margin-bottom: 30px;
+    color: #ff66b2;
+}
+
+.auth input {
+    width: 100%;
+    padding: 15px;
+    margin: 10px 0;
+    border-radius: 10px;
+    border: 2px solid #333;
+    background: #111;
+    color: white;
+    font-size: 16px;
+    transition: 0.3s;
+}
+
+.auth input:focus {
+    border-color: #ff66b2;
+    box-shadow: 0 0 15px rgba(255, 102, 178, 0.3);
+    outline: none;
+}
+
+.auth button {
+    width: 100%;
+    padding: 15px;
+    background: #ff66b2;
+    color: white;
+    font-size: 16px;
+    border: none;
+    border-radius: 10px;
+    cursor: pointer;
+    margin-top: 20px;
+    transition: 0.3s;
+    font-weight: 600;
+}
+
+.auth button:hover {
+    background: #e62b9b;
+    transform: translateY(-2px);
+    box-shadow: 0 5px 15px rgba(255, 102, 178, 0.4);
+}
+
+
+/* ===== Upload Form & Common Sections ===== */
+
+#uploadForm,
+#cart,
+#wishlist,
+#manageSection,
+#editSection,
+#adminDashboard {
+    max-width: 800px;
+    margin: 40px auto;
+    padding: 30px;
+    background: #222;
+    border-radius: 20px;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+    animation: fadeIn 0.4s ease;
+}
+
+#uploadForm input,
+#uploadForm button,
+#searchBar input,
+#searchBar select,
+#searchBar button {
+    margin: 10px 0;
+    padding: 12px;
+    width: 100%;
+    border-radius: 8px;
+    border: 1px solid #444;
+    background: #111;
+    color: white;
+    transition: 0.3s;
+}
+
+#uploadForm button,
+#searchBar button {
+    background: #ff66b2;
+    border: none;
+    cursor: pointer;
+    font-weight: 600;
+}
+
+#uploadForm button:hover,
+#searchBar button:hover {
+    background: #e62b9b;
+}
+
+
+/* ===== Cart, Wishlist & Payment ===== */
+
+.cart-item,
+.wishlist-item,
+.remove-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 20px;
+    background: #1a1a1a;
+    padding: 15px;
+    border-radius: 12px;
+    transition: 0.3s;
+}
+
+.cart-item:hover,
+.wishlist-item:hover,
+.remove-item:hover {
+    transform: translateX(5px);
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+}
+
+.cart-item img,
+.wishlist-item img,
+.remove-item img {
+    width: 100px;
+    height: 100px;
+    border-radius: 10px;
+    object-fit: cover;
+}
+
+.cart-item div,
+.wishlist-item div,
+.remove-item div {
+    flex: 1;
+    margin-left: 20px;
+    color: #ff99cc;
+    font-size: 18px;
+}
+
+.cart-item button,
+.wishlist-item button,
+.remove-item button {
+    padding: 8px 15px;
+    background: #ff66b2;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    margin-left: 5px;
+    transition: 0.3s;
+}
+
+.cart-item button:hover,
+.wishlist-item button:hover,
+.remove-item button:hover {
+    background: #e62b9b;
+    transform: scale(1.05);
+}
+
+
+/* ===== Payment Buttons ===== */
+
+.payment-buttons {
+    display: grid;
+    gap: 10px;
+    margin-top: 20px;
+}
+
+.payment-buttons button {
+    padding: 15px;
+    width: 100%;
+    border: none;
+    border-radius: 10px;
+    cursor: pointer;
+    background: #333;
+    color: white;
+    font-weight: 500;
+    transition: 0.3s;
+    border: 1px solid transparent;
+}
+
+.payment-buttons button:hover {
+    background: #111;
+    border-color: #ff66b2;
+    color: #ff66b2;
+}
+
+.payment-buttons button.active {
+    background: #ff66b2;
+    color: white;
+}
+
+
+/* ===== Search Bar ===== */
+
+#searchBar {
+    max-width: 600px;
+    margin: 30px auto;
+    display: flex;
+    gap: 15px;
+    padding: 0 20px;
+}
+
+
+/* ===== Footer ===== */
+
+footer {
+    background: #0f0f0f;
+    color: #ccc;
+    padding: 60px 40px;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 40px;
+    border-top: 1px solid #333;
+    margin-top: 50px;
+}
+
+footer div {
+    flex: 1;
+    min-width: 250px;
+}
+
+footer h3 {
+    margin-bottom: 20px;
+    color: #ff66b2;
+    font-size: 20px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+footer a,
+footer button {
+    display: block;
+    color: #aaa;
+    text-decoration: none;
+    margin: 8px 0;
+    transition: 0.3s;
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 15px;
+    text-align: left;
+    padding: 0;
+}
+
+footer a:hover,
+footer button:hover {
+    color: #ff66b2;
+    padding-left: 5px;
+}
+
+footer input {
+    background: #222;
+    color: white;
+    border: 1px solid #444;
+    border-radius: 6px;
+    padding: 12px;
+    margin-bottom: 10px;
+    width: 100%;
+    transition: 0.3s;
+}
+
+footer input:focus {
+    border-color: #ff66b2;
+    outline: none;
+}
+
+
+/* ===== Side Vertical Buttons ===== */
+
+#sideButtons {
+    position: fixed;
+    top: 50%;
+    right: 20px;
+    transform: translateY(-50%);
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    z-index: 99;
+}
+
+#sideButtons button {
+    padding: 12px;
+    width: 50px;
+    height: 50px;
+    background: #222;
+    color: white;
+    border: 2px solid #ff66b2;
+    border-radius: 50%;
+    cursor: pointer;
+    transition: 0.3s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.5);
+}
+
+#sideButtons button:hover {
+    background: #ff66b2;
+    transform: scale(1.1);
+}
+
+#sideButtons button span {
+    display: none;
+    position: absolute;
+    right: 60px;
+    background: #ff66b2;
+    padding: 5px 10px;
+    border-radius: 5px;
+    font-size: 14px;
+    white-space: nowrap;
+}
+
+#sideButtons button:hover span {
+    display: block;
+}
+
+
+/* ===== Animations ===== */
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes slideDown {
+    from {
+        transform: translateY(-50px);
+        opacity: 0;
+    }
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+@keyframes zoomIn {
+    from {
+        transform: scale(0.9);
+        opacity: 0;
+    }
+    to {
+        transform: scale(1);
+        opacity: 1;
+    }
+}
+
+
+/* ===== Responsive ===== */
+
+@media(max-width:768px) {
+    header {
+        padding: 15px 20px;
+        flex-wrap: wrap;
+    }
+    #banner {
+        height: 250px;
+        font-size: 32px;
+    }
+    .products {
+        grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+        gap: 15px;
+    }
+    .card img {
+        height: 200px;
+    }
+    #detail img#mainImage {
+        width: 100%;
+    }
+    #searchBar {
+        flex-direction: column;
+    }
+    footer {
+        flex-direction: column;
+        padding: 30px 20px;
+    }
+}
