@@ -185,7 +185,7 @@ app.get('/api/products', (req, res) => {
 app.post('/api/products', upload.array('images'), (req, res) => {
     const { name, price, desc, image_url } = req.body;
     let imageUrl = image_url || 'https://via.placeholder.com/400';
-    if (!usePg && req.files && req.files.length > 0) {
+    if (req.files && req.files.length > 0) {
         imageUrl = '/uploads/' + req.files[0].filename;
     }
     if (usePg) {
@@ -207,9 +207,10 @@ app.put('/api/products/:id', upload.array('images'), (req, res) => {
     if (usePg) {
         let sql = "UPDATE products SET name = $1, price = $2, description = $3 WHERE id = $4";
         let params = [name, price, desc, id];
-        if (image_url) {
+        if ((req.files && req.files.length > 0) || image_url) {
+            const img = (req.files && req.files.length > 0) ? ('/uploads/' + req.files[0].filename) : image_url;
             sql = "UPDATE products SET name = $1, price = $2, description = $3, image_url = $4 WHERE id = $5";
-            params = [name, price, desc, image_url, id];
+            params = [name, price, desc, img, id];
         }
         pgPool.query(sql, params).then(() => res.json({ success: true })).catch(err => res.status(500).json({ error: err.message }));
     } else {
@@ -326,6 +327,22 @@ app.get('/api/payments', (req, res) => {
         db.all(sql, [], (err, rows) => {
             if (err) return res.status(500).json({ error: err.message });
             res.json(rows);
+        });
+    }
+});
+
+app.get('/api/health', async (req, res) => {
+    if (usePg) {
+        try {
+            const r = await pgPool.query('SELECT 1 as ok');
+            return res.json({ db: 'postgres', ok: !!(r.rows && r.rows[0] && r.rows[0].ok) });
+        } catch (e) {
+            return res.status(500).json({ db: 'postgres', error: e.message });
+        }
+    } else {
+        db.get('SELECT 1 as ok', [], (err, row) => {
+            if (err) return res.status(500).json({ db: 'sqlite', error: err.message });
+            res.json({ db: 'sqlite', ok: !!(row && row.ok) });
         });
     }
 });

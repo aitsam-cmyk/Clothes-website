@@ -213,18 +213,19 @@ function updateUI() {
         if (loginBtn instanceof HTMLElement) loginBtn.style.display = 'none';
         if (logoutBtn instanceof HTMLElement) logoutBtn.style.display = 'block';
         
-        // Show Admin buttons if admin
-        if (user.role === 'admin') {
-            // FIX: Added instanceof check for loop
-            document.querySelectorAll('[id^="btn"]').forEach(btn => {
-                if (btn instanceof HTMLElement) {
-                    btn.style.display = 'flex';
-                }
-            });
-        }
+        document.querySelectorAll('[id^="btn"]').forEach(btn => {
+            if (btn instanceof HTMLElement) {
+                btn.style.display = user.role === 'admin' ? 'flex' : 'none';
+            }
+        });
     } else {
         if (loginBtn instanceof HTMLElement) loginBtn.style.display = 'block';
         if (logoutBtn instanceof HTMLElement) logoutBtn.style.display = 'none';
+        document.querySelectorAll('[id^="btn"]').forEach(btn => {
+            if (btn instanceof HTMLElement) {
+                btn.style.display = 'none';
+            }
+        });
     }
 }
 
@@ -255,7 +256,7 @@ function renderProducts(items) {
             <p>Rs. ${p.price}</p>
             <button onclick="addToCart(${p.id})">Add to Cart</button>
             <button onclick="addToWishlist(${p.id})">Add to Wishlist</button>
-            <button class="quick-view-btn" onclick="alert('Detail view coming soon')">View</button>
+            <button class="quick-view-btn" onclick="showDetail(${p.id})">View</button>
         </div>
     `).join('');
     setupReveal();
@@ -309,6 +310,25 @@ function isAdmin() {
     } catch {
         return false;
     }
+}
+
+function showDetail(id) {
+    const suit = products.find(p => p.id === id);
+    const detailEl = document.getElementById('detail');
+    if (!suit || !detailEl) return;
+    detailEl.innerHTML = `
+        <div class="detail-view">
+            <img src="${suit.image_url}" alt="${suit.name}" style="width:100%; max-width:500px; border-radius:12px;"/>
+            <h2 style="margin-top:15px;">${suit.name}</h2>
+            <p style="font-size:18px;">Rs. ${suit.price}</p>
+            <p style="margin:10px 0; color:#ccc;">${suit.description || 'No description available.'}</p>
+            <div style="display:flex; gap:10px; margin-top:15px;">
+                <button onclick="addToCart(${suit.id})">Add to Cart</button>
+                <button onclick="goHome()" style="background:#555;">Back</button>
+            </div>
+        </div>
+    `;
+    showSection('detail');
 }
 
 async function submitNewSuit() {
