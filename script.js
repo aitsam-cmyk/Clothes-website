@@ -1,6 +1,5 @@
 // ===== Configuration =====
-// TODO: Replace with your Hugging Face Backend URL after deployment (e.g., 'https://your-space-name.hf.space/api')
-const DEFAULT_API = '/api';
+const DEFAULT_API = 'https://aitsam916-clothes-backend.hf.space/api';
 const API_URL = localStorage.getItem('API_URL') || DEFAULT_API;
 
 let products = [];
