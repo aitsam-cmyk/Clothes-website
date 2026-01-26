@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ZELLBURY OFFICIAL 3 - Premium Ladies Wear</title>
+    <title>ZELL Brand - Premium Ladies Wear</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <link rel="stylesheet" href="style.css">
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -13,29 +13,37 @@
 <body>
 
     <header>
-        <div class="social-icons">
-            <a href="https://www.facebook.com/yourpage" target="_blank" title="Facebook"><i class="fab fa-facebook-square"></i></a>
-            <a href="https://www.instagram.com/yourprofile" target="_blank" title="Instagram"><i class="fab fa-instagram"></i></a>
-            <a href="https://wa.me/923001215152" target="_blank" title="WhatsApp"><i class="fab fa-whatsapp"></i></a>
-            <a href="https://twitter.com/yourprofile" target="_blank" title="Twitter"><i class="fab fa-twitter"></i></a>
-        </div>
+        <>
+            <div class="social-icons">
+                <a href="https://www.facebook.com/yourpage" target="_blank" title="Facebook"><i class="fab fa-facebook-square"></i></a>
+                <a href="https://www.instagram.com/yourprofile" target="_blank" title="Instagram"><i class="fab fa-instagram"></i></a>
+                <a href="https://wa.me/923001215152" target="_blank" title="WhatsApp"><i class="fab fa-whatsapp"></i></a>
+                <a href="https://twitter.com/yourprofile" target="_blank" title="Twitter"><i class="fab fa-twitter"></i></a>
+            </div>
 
-        <div id="backArrow" onclick="goHome()" title="Back to Home">←</div>
+            <div id="backArrow" onclick="goHome()" title="Back to Home">←</div>
 
-        <h2 onclick="goHome()">Ladies Suits</h2>
-        <div style="margin-left:auto; display:flex; align-items:center; gap:15px;">
-            <div class="apps" onclick="alert('Feature coming soon!')" title="More Apps"><i class="fas fa-th"></i></div>
-            <div class="menu" onclick="toggleDropdown()" title="Menu">⋮
-                <div class="dropdown" id="dropdownMenu">
-                    <button onclick="showSection('login')"><i class="fas fa-sign-in-alt"></i> Login</button>
-                    <button onclick="showSection('signup')"><i class="fas fa-user-plus"></i> Sign Up</button>
-                    <button onclick="logout()"><i class="fas fa-sign-out-alt"></i> Logout</button>
+            <h2 onclick="goHome()">Home</h2>
+            <div style="margin-left:auto; display:flex; align-items:center; gap:15px;">
+                <div class="apps" onclick="alert('Feature coming soon!')" title="More Apps"><i class="fas fa-th"></i></div>
+
+                <!-- Updated 3 Dost Menu -->
+                <div class="menu" onclick="toggleDropdown()" title="Menu">⋮
+                    <div class="dropdown" id="dropdownMenu">
+                        <!-- Added id="loginBtn" so JS can hide this -->
+                        <button id="loginBtn" onclick="showSection('login')"><i class="fas fa-sign-in-alt"></i> Login</button>
+
+                        <!-- Signup button (Always visible in menu usually, or handled by JS) -->
+                        <button onclick="showSection('signup')"><i class="fas fa-user-plus"></i> Sign Up</button>
+
+                        <!-- Added id="logoutBtn" so JS can show this -->
+                        <button id="logoutBtn" style="display:none;" onclick="logout()"><i class="fas fa-sign-out-alt"></i> Logout</button>
+                    </div>
                 </div>
             </div>
-        </div>
     </header>
 
-    <div id="banner">BRAND STORE</div>
+    <div id="banner">Zell STORE</div>
 
     <div id="searchBar">
         <input type="text" id="searchInput" placeholder="Search for suits..." onkeyup="filterProducts()">
@@ -57,9 +65,9 @@
         <div id="cartItems"></div>
         <div class="payment-buttons">
             <h3>Pay Now:</h3>
-            <button onclick="pay('Easypaisa')">Easypaisa</button>
-            <button onclick="pay('JazzCash')">JazzCash</button>
-            <button onclick="pay('Credit/Debit Card')">Credit/Debit Card</button>
+            <button onclick="pay(this,'Easypaisa')">Easypaisa</button>
+            <button onclick="pay(this,'JazzCash')">JazzCash</button>
+            <button onclick="pay(this,'Credit/Debit Card')">Credit/Debit Card</button>
         </div>
         <button style="margin-top:20px; width:100%; padding:15px; background:#28a745; color:white; border:none; border-radius:8px; cursor:pointer; font-size:16px; font-weight:bold;" onclick="placeOrder()">Place Order</button>
     </section>
@@ -156,7 +164,7 @@
         <div>
             <h3>About Us</h3>
             <p style="line-height:1.6; color:#aaa;">
-                Welcome to <strong>Zellbury Official</strong> – your ultimate destination for elegant and trendy ladies’ clothing. We believe every woman deserves to look stylish, confident, and unique.
+                Welcome to <strong>Zell Official</strong> – your ultimate destination for elegant and trendy ladies’ clothing. We believe every woman deserves to look stylish, confident, and unique.
             </p>
         </div>
 
@@ -176,7 +184,7 @@
 
         <div>
             <h3>Contact</h3>
-            <a href="mailto:zellburyofficial3@gmail.com"><i class="fas fa-envelope"></i> zellburyofficial3@gmail.com</a>
+            <a href="mailto:zell@gmail.com"><i class="fas fa-envelope"></i> zell@gmail.com</a>
             <a href="tel:+923001215152"><i class="fas fa-phone"></i> +92 3001215152</a>
             <button onclick="alert('Thank you for your feedback!')" style="margin-top:10px; color:#ff66b2;">Give Feedback</button>
         </div>

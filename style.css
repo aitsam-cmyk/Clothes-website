@@ -98,7 +98,7 @@ header .menu {
 }
 
 header .dropdown {
-    display: none;
+    display: block;
     position: absolute;
     top: 45px;
     right: 0;
@@ -107,8 +107,17 @@ header .dropdown {
     border-radius: 8px;
     box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
     overflow: hidden;
-    animation: fadeIn 0.3s ease;
     z-index: 1001;
+    opacity: 0;
+    transform: translateY(8px);
+    pointer-events: none;
+    transition: all 0.25s ease;
+}
+
+.dropdown.show {
+    opacity: 1;
+    transform: translateY(0);
+    pointer-events: auto;
 }
 
 header .dropdown button {
@@ -134,8 +143,8 @@ header .dropdown button:hover {
 
 #banner {
     width: 100%;
-    height: 400px;
-    background: linear-gradient(rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 0.5)), url('https://via.placeholder.com/1200x350/111/ff66b2?text=Ladies+Suits+Collection') center/cover no-repeat;
+    height: 350px;
+    background: linear-gradient(135deg, #111, #333);
     display: flex;
     justify-content: center;
     align-items: center;
@@ -359,6 +368,21 @@ section {
     box-shadow: 0 5px 15px rgba(255, 102, 178, 0.4);
 }
 
+.hidden {
+    display: none;
+}
+
+.reveal {
+    opacity: 0;
+    transform: translateY(24px);
+    transition: opacity 0.5s ease, transform 0.5s ease;
+    will-change: opacity, transform;
+}
+
+.revealed {
+    opacity: 1;
+    transform: translateY(0);
+}
 
 /* ===== Upload Form & Common Sections ===== */
 

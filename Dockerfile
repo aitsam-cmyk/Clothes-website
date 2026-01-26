@@ -13,8 +13,11 @@ COPY . .
 # Create uploads directory
 RUN mkdir -p uploads
 
+# Set default port for Hugging Face
+ENV PORT=7860
+
 # Expose port
-EXPOSE 3000
+EXPOSE 7860
 
 # Start command
 CMD [ "node", "server.js" ]
