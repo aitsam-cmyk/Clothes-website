@@ -233,7 +233,8 @@ async function fetchProducts() {
     try {
         const res = await fetch(`${API_URL}/products`);
         const data = await res.json();
-        products = data.map(p => ({
+        const arr = Array.isArray(data) ? data : [];
+        products = arr.map(p => ({
             ...p,
             image_url: p.image_url || '/placeholder.svg'
         }));
