@@ -20,13 +20,41 @@ function isValidPgUrl(u) {
 const usePg = isValidPgUrl(process.env.DATABASE_URL);
 let db = null;
 let pgPool = null;
+let pgUrlInUse = process.env.DATABASE_URL || null;
+
+function altPgUrl(u) {
+    try {
+        const parsed = new URL(u);
+        if (parsed.hostname.includes('-pooler.')) {
+            const altHost = parsed.hostname.replace('-pooler.', '.');
+            parsed.hostname = altHost;
+            return parsed.toString();
+        }
+    } catch {}
+    return null;
+}
+
+async function ensurePgPool() {
+    if (!usePg) return;
+    const { Pool } = require('pg');
+    const candidates = [pgUrlInUse].concat(altPgUrl(pgUrlInUse) ? [altPgUrl(pgUrlInUse)] : []);
+    for (const url of candidates) {
+        try {
+            pgPool = new Pool({ connectionString: url, ssl: { rejectUnauthorized: false }, keepAlive: true, connectionTimeoutMillis: 8000 });
+            await pgPool.query('SELECT 1');
+            pgUrlInUse = url;
+            return true;
+        } catch (e) {
+            pgPool = null;
+        }
+    }
+    return false;
+}
 
 if (usePg) {
     const { Pool } = require('pg');
-    pgPool = new Pool({
-        connectionString: process.env.DATABASE_URL,
-        ssl: { rejectUnauthorized: false }
-    });
+    // try to init immediately; will retry in health if DNS error occurs
+    (async () => { await ensurePgPool(); })();
     function initPg() {
         const queries = [
             "CREATE TABLE IF NOT EXISTS users (id SERIAL PRIMARY KEY, name TEXT NOT NULL, email TEXT UNIQUE NOT NULL, password TEXT NOT NULL, role TEXT DEFAULT 'customer')",
@@ -174,6 +202,7 @@ app.get('/api/products', (req, res) => {
             pgPool.query(sql),
             pgPool.query("SELECT product_id, url FROM product_images")
         ]).then(([pr, ir]) => {
+            const base = `${req.protocol}://${req.get('host')}`;
             const imgMap = {};
             ir.rows.forEach(row => {
                 (imgMap[row.product_id] = imgMap[row.product_id] || []).push(row.url);
@@ -181,15 +210,29 @@ app.get('/api/products', (req, res) => {
             const products = pr.rows.map(p => {
                 const imgs = imgMap[p.id] || [];
                 const list = p.image_url ? [p.image_url, ...imgs] : imgs;
-                return { ...p, images: list.length ? list : ['/placeholder.svg'] };
+                const absList = list.map(u => u && u.startsWith('/') ? (base + u) : u).filter(Boolean);
+                return { ...p, images: absList.length ? absList : [base + '/placeholder.svg'] };
             });
             res.json(products);
         }).catch(err => res.status(500).json({ error: err.message }));
     } else {
+        const base = `${req.protocol}://${req.get('host')}`;
         db.all(sql, [], (err, rows) => {
             if (err) return res.status(500).json({ error: err.message });
-            const products = rows.map(p => ({ ...p, images: [p.image_url] }));
-            res.json(products);
+            db.all("SELECT product_id, url FROM product_images", [], (e2, imgs) => {
+                if (e2) return res.status(500).json({ error: e2.message });
+                const map = {};
+                imgs.forEach(r => {
+                    (map[r.product_id] = map[r.product_id] || []).push(r.url);
+                });
+                const products = rows.map(p => {
+                    const list = (map[p.id] || []);
+                    if (p.image_url) list.unshift(p.image_url);
+                    const absList = list.map(u => u && u.startsWith('/') ? (base + u) : u).filter(Boolean);
+                    return { ...p, images: absList.length ? absList : [base + '/placeholder.svg'] };
+                });
+                res.json(products);
+            });
         });
     }
 });
@@ -380,9 +423,24 @@ app.get('/api/payments', (req, res) => {
 app.get('/api/health', async (req, res) => {
     if (usePg) {
         try {
+            if (!pgPool) {
+                const ok = await ensurePgPool();
+                if (!ok) throw new Error('pg init failed');
+            }
             const r = await pgPool.query('SELECT 1 as ok');
             return res.json({ db: 'postgres', ok: !!(r.rows && r.rows[0] && r.rows[0].ok) });
         } catch (e) {
+            if ((e.message || '').includes('EAI_AGAIN')) {
+                const tried = await ensurePgPool();
+                if (tried) {
+                    try {
+                        const r2 = await pgPool.query('SELECT 1 as ok');
+                        return res.json({ db: 'postgres', ok: !!(r2.rows && r2.rows[0] && r2.rows[0].ok), url: pgUrlInUse });
+                    } catch (e2) {
+                        return res.status(500).json({ db: 'postgres', error: e2.message });
+                    }
+                }
+            }
             return res.status(500).json({ db: 'postgres', error: e.message });
         }
     } else {
