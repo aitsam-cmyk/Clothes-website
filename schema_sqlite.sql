@@ -17,6 +17,14 @@ CREATE TABLE IF NOT EXISTS products (
     image_url TEXT
 );
 
+-- Product Images (multiple images per product)
+CREATE TABLE IF NOT EXISTS product_images (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    product_id INTEGER,
+    url TEXT,
+    FOREIGN KEY(product_id) REFERENCES products(id) ON DELETE CASCADE
+);
+
 -- Orders Table
 CREATE TABLE IF NOT EXISTS orders (
     id INTEGER PRIMARY KEY AUTOINCREMENT,

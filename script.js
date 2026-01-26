@@ -6,6 +6,18 @@ let products = [];
 let cart = [];
 let revealObserver = null;
 let selectedPaymentMethod = null;
+const PAYMENT_DETAILS = {
+    Easypaisa: { title: 'Easypaisa', account: '0345-0000000', name: 'Account Owner' },
+    JazzCash: { title: 'JazzCash', account: '0300-0000000', name: 'Account Owner' },
+    'Credit/Debit Card': { title: 'Bank Transfer', account: '000123456789', bank: 'ABC Bank', name: 'Account Owner' }
+};
+try {
+    const override = localStorage.getItem('PAYMENT_INFO');
+    if (override) {
+        const obj = JSON.parse(override);
+        Object.assign(PAYMENT_DETAILS, obj);
+    }
+} catch {}
 
 document.addEventListener('DOMContentLoaded', () => {
     initRevealObserver();
@@ -251,7 +263,7 @@ function renderProducts(items) {
 
     container.innerHTML = items.map(p => `
         <div class="card reveal">
-            <img src="${p.image_url}" alt="${p.name}">
+            <img src="${(Array.isArray(p.images) && p.images[0]) || p.image_url}" alt="${p.name}">
             <h3>${p.name}</h3>
             <p>Rs. ${p.price}</p>
             <button onclick="addToCart(${p.id})">Add to Cart</button>
@@ -316,9 +328,10 @@ function showDetail(id) {
     const suit = products.find(p => p.id === id);
     const detailEl = document.getElementById('detail');
     if (!suit || !detailEl) return;
+    const gallery = (Array.isArray(suit.images) ? suit.images : [suit.image_url]).map(url => `<img src="${url}" alt="${suit.name}" style="width:100%; max-width:120px; border-radius:8px; margin-right:8px;"/>`).join('');
     detailEl.innerHTML = `
         <div class="detail-view">
-            <img src="${suit.image_url}" alt="${suit.name}" style="width:100%; max-width:500px; border-radius:12px;"/>
+            <div style="display:flex; flex-wrap:wrap; gap:8px; align-items:center;">${gallery}</div>
             <h2 style="margin-top:15px;">${suit.name}</h2>
             <p style="font-size:18px;">Rs. ${suit.price}</p>
             <p style="margin:10px 0; color:#ccc;">${suit.description || 'No description available.'}</p>
@@ -560,7 +573,17 @@ function pay(el, method) {
     btns.forEach(b => b.classList.remove('active'));
     if (el instanceof HTMLElement) el.classList.add('active');
     selectedPaymentMethod = method;
-    alert(`Selected: ${method}`);
+    const infoEl = document.getElementById('paymentInfo');
+    if (!infoEl) return;
+    const d = PAYMENT_DETAILS[method] || {};
+    let html = '';
+    if (method === 'Easypaisa' || method === 'JazzCash') {
+        html = `<strong>${d.title || method}</strong><br>Account: ${d.account || '-'}<br>Name: ${d.name || '-'}`;
+    } else {
+        html = `<strong>${d.title || method}</strong><br>Account: ${d.account || '-'}<br>Bank: ${d.bank || '-'}<br>Name: ${d.name || '-'}`;
+    }
+    infoEl.style.display = 'block';
+    infoEl.innerHTML = html;
 }
 
 let wishlist = [];

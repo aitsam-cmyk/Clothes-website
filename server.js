@@ -31,6 +31,7 @@ if (usePg) {
         const queries = [
             "CREATE TABLE IF NOT EXISTS users (id SERIAL PRIMARY KEY, name TEXT NOT NULL, email TEXT UNIQUE NOT NULL, password TEXT NOT NULL, role TEXT DEFAULT 'customer')",
             "CREATE TABLE IF NOT EXISTS products (id SERIAL PRIMARY KEY, name TEXT NOT NULL UNIQUE, price NUMERIC(10,2) NOT NULL, description TEXT, category TEXT, image_url TEXT)",
+            "CREATE TABLE IF NOT EXISTS product_images (id SERIAL PRIMARY KEY, product_id INTEGER REFERENCES products(id) ON DELETE CASCADE, url TEXT)",
             "CREATE TABLE IF NOT EXISTS orders (id SERIAL PRIMARY KEY, user_email TEXT NOT NULL, total_amount NUMERIC(10,2) NOT NULL, status TEXT DEFAULT 'Pending', created_at TIMESTAMP DEFAULT NOW())",
             "CREATE TABLE IF NOT EXISTS order_items (id SERIAL PRIMARY KEY, order_id INTEGER REFERENCES orders(id) ON DELETE CASCADE, product_id INTEGER REFERENCES products(id), quantity INTEGER, price_at_time NUMERIC(10,2))",
             "CREATE TABLE IF NOT EXISTS payments (id SERIAL PRIMARY KEY, order_id INTEGER REFERENCES orders(id) ON DELETE CASCADE, method TEXT, status TEXT DEFAULT 'Pending', paid_amount NUMERIC(10,2), transaction_id TEXT, payer_email TEXT, created_at TIMESTAMP DEFAULT NOW())",
@@ -169,8 +170,19 @@ app.post('/api/signup', (req, res) => {
 app.get('/api/products', (req, res) => {
     const sql = "SELECT * FROM products";
     if (usePg) {
-        pgPool.query(sql).then(r => {
-            const products = r.rows.map(p => ({ ...p, images: [p.image_url] }));
+        Promise.all([
+            pgPool.query(sql),
+            pgPool.query("SELECT product_id, url FROM product_images")
+        ]).then(([pr, ir]) => {
+            const imgMap = {};
+            ir.rows.forEach(row => {
+                (imgMap[row.product_id] = imgMap[row.product_id] || []).push(row.url);
+            });
+            const products = pr.rows.map(p => {
+                const imgs = imgMap[p.id] || [];
+                const list = p.image_url ? [p.image_url, ...imgs] : imgs;
+                return { ...p, images: list.length ? list : ['/placeholder.svg'] };
+            });
             res.json(products);
         }).catch(err => res.status(500).json({ error: err.message }));
     } else {
@@ -190,13 +202,31 @@ app.post('/api/products', upload.array('images'), (req, res) => {
     }
     if (usePg) {
         const sql = "INSERT INTO products (name, price, description, category, image_url) VALUES ($1, $2, $3, 'suits', $4) RETURNING id";
-        pgPool.query(sql, [name, price, desc, imageUrl]).then(r => {
-            res.json({ success: true, id: r.rows[0].id });
+        pgPool.query(sql, [name, price, desc, imageUrl]).then(async r => {
+            const id = r.rows[0].id;
+            if (req.files && req.files.length > 0) {
+                for (let i = 0; i < req.files.length; i++) {
+                    const url = '/uploads/' + req.files[i].filename;
+                    await pgPool.query("INSERT INTO product_images (product_id, url) VALUES ($1, $2)", [id, url]);
+                }
+            } else if (imageUrl) {
+                await pgPool.query("INSERT INTO product_images (product_id, url) VALUES ($1, $2)", [id, imageUrl]);
+            }
+            res.json({ success: true, id });
         }).catch(err => res.status(500).json({ error: err.message }));
     } else {
         db.run("INSERT INTO products (name, price, description, category, image_url) VALUES (?, ?, ?, 'suits', ?)", [name, price, desc, imageUrl], function(err) {
             if (err) return res.status(500).json({ error: err.message });
-            res.json({ success: true, id: this.lastID });
+            const id = this.lastID;
+            if (req.files && req.files.length > 0) {
+                const stmt = db.prepare("INSERT INTO product_images (product_id, url) VALUES (?, ?)");
+                for (let i = 0; i < req.files.length; i++) {
+                    const url = '/uploads/' + req.files[i].filename;
+                    stmt.run(id, url);
+                }
+                stmt.finalize();
+            }
+            res.json({ success: true, id });
         });
     }
 });
@@ -212,7 +242,15 @@ app.put('/api/products/:id', upload.array('images'), (req, res) => {
             sql = "UPDATE products SET name = $1, price = $2, description = $3, image_url = $4 WHERE id = $5";
             params = [name, price, desc, img, id];
         }
-        pgPool.query(sql, params).then(() => res.json({ success: true })).catch(err => res.status(500).json({ error: err.message }));
+        pgPool.query(sql, params).then(async () => {
+            if (req.files && req.files.length > 1) {
+                for (let i = 1; i < req.files.length; i++) {
+                    const url = '/uploads/' + req.files[i].filename;
+                    await pgPool.query("INSERT INTO product_images (product_id, url) VALUES ($1, $2)", [id, url]);
+                }
+            }
+            res.json({ success: true });
+        }).catch(err => res.status(500).json({ error: err.message }));
     } else {
         let sql = "UPDATE products SET name = ?, price = ?, description = ? WHERE id = ?";
         let params = [name, price, desc, id];
@@ -223,6 +261,14 @@ app.put('/api/products/:id', upload.array('images'), (req, res) => {
         }
         db.run(sql, params, function(err) {
             if (err) return res.status(500).json({ error: err.message });
+            if (req.files && req.files.length > 1) {
+                const stmt = db.prepare("INSERT INTO product_images (product_id, url) VALUES (?, ?)");
+                for (let i = 1; i < req.files.length; i++) {
+                    const url = '/uploads/' + req.files[i].filename;
+                    stmt.run(id, url);
+                }
+                stmt.finalize();
+            }
             res.json({ success: true });
         });
     }
