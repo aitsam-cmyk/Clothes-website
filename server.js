@@ -60,9 +60,16 @@ if (usePg) {
             "CREATE TABLE IF NOT EXISTS users (id SERIAL PRIMARY KEY, name TEXT NOT NULL, email TEXT UNIQUE NOT NULL, password TEXT NOT NULL, role TEXT DEFAULT 'customer')",
             "CREATE TABLE IF NOT EXISTS products (id SERIAL PRIMARY KEY, name TEXT NOT NULL UNIQUE, price NUMERIC(10,2) NOT NULL, description TEXT, category TEXT, image_url TEXT)",
             "CREATE TABLE IF NOT EXISTS product_images (id SERIAL PRIMARY KEY, product_id INTEGER REFERENCES products(id) ON DELETE CASCADE, url TEXT)",
-            "CREATE TABLE IF NOT EXISTS orders (id SERIAL PRIMARY KEY, user_email TEXT NOT NULL, total_amount NUMERIC(10,2) NOT NULL, status TEXT DEFAULT 'Pending', created_at TIMESTAMP DEFAULT NOW())",
+            "CREATE TABLE IF NOT EXISTS orders (id SERIAL PRIMARY KEY, user_email TEXT NOT NULL, total_amount NUMERIC(10,2) NOT NULL, status TEXT DEFAULT 'Pending', created_at TIMESTAMP DEFAULT NOW(), customer_name TEXT, address TEXT, contact_number TEXT, pieces_count INTEGER, color_preferences TEXT, screenshot_url TEXT)",
             "CREATE TABLE IF NOT EXISTS order_items (id SERIAL PRIMARY KEY, order_id INTEGER REFERENCES orders(id) ON DELETE CASCADE, product_id INTEGER REFERENCES products(id), quantity INTEGER, price_at_time NUMERIC(10,2))",
             "CREATE TABLE IF NOT EXISTS payments (id SERIAL PRIMARY KEY, order_id INTEGER REFERENCES orders(id) ON DELETE CASCADE, method TEXT, status TEXT DEFAULT 'Pending', paid_amount NUMERIC(10,2), transaction_id TEXT, payer_email TEXT, created_at TIMESTAMP DEFAULT NOW())",
+            "CREATE TABLE IF NOT EXISTS reviews (id SERIAL PRIMARY KEY, product_id INTEGER REFERENCES products(id) ON DELETE SET NULL, user_name TEXT, rating INTEGER, comment TEXT, status TEXT DEFAULT 'Approved', created_at TIMESTAMP DEFAULT NOW())",
+            "ALTER TABLE orders ADD COLUMN IF NOT EXISTS customer_name TEXT",
+            "ALTER TABLE orders ADD COLUMN IF NOT EXISTS address TEXT",
+            "ALTER TABLE orders ADD COLUMN IF NOT EXISTS contact_number TEXT",
+            "ALTER TABLE orders ADD COLUMN IF NOT EXISTS pieces_count INTEGER",
+            "ALTER TABLE orders ADD COLUMN IF NOT EXISTS color_preferences TEXT",
+            "ALTER TABLE orders ADD COLUMN IF NOT EXISTS screenshot_url TEXT",
             "INSERT INTO users (name, email, password, role) VALUES ('Admin1', 'zellburyofficial3@gmail.com', 'farnaz90', 'admin') ON CONFLICT (email) DO NOTHING",
             "INSERT INTO users (name, email, password, role) VALUES ('Admin2', 'jasimkhan5917@gmail.com', '@Jasimkhan5917', 'admin') ON CONFLICT (email) DO NOTHING",
             "INSERT INTO users (name, email, password, role) VALUES ('Admin3', 'admin@store.com', 'admin123', 'admin') ON CONFLICT (email) DO NOTHING"
@@ -178,6 +185,49 @@ app.post('/api/signup', (req, res) => {
         });
     }
 });
+
+async function notifyOwnerEmail(orderId, info) {
+    try {
+        let admins = [];
+        if (usePg) {
+            const r = await pgPool.query("SELECT email FROM users WHERE role = 'admin'");
+            admins = r.rows.map(x => x.email);
+        } else {
+            await new Promise((resolve) => {
+                db.all("SELECT email FROM users WHERE role = 'admin'", [], (err, rows) => {
+                    admins = (rows || []).map(x => x.email);
+                    resolve();
+                });
+            });
+        }
+        const toList = (process.env.OWNER_EMAIL || '').split(',').filter(Boolean);
+        const recipients = toList.length ? toList : admins;
+        if (!recipients.length) return;
+        let nodemailer;
+        try {
+            nodemailer = require('nodemailer');
+        } catch {
+            return;
+        }
+        const host = process.env.SMTP_HOST || 'smtp.gmail.com';
+        const port = parseInt(process.env.SMTP_PORT || '587', 10);
+        const user = process.env.SMTP_USER;
+        const pass = process.env.SMTP_PASS;
+        if (!user || !pass) return;
+        const transport = nodemailer.createTransport({ host, port, secure: port === 465, auth: { user, pass } });
+        const subject = `New Order #${orderId}`;
+        const text = `Order ID: ${orderId}
+Email: ${info.email}
+Name: ${info.customerName || '-'}
+Contact: ${info.contactNumber || '-'}
+Address: ${info.address || '-'}
+Pieces: ${info.piecesCount || '-'}
+Colors: ${info.colorPreferences || '-'}
+Total: ${info.total}
+Payment Method: ${info.method}`;
+        await transport.sendMail({ from: user, to: recipients.join(','), subject, text });
+    } catch {}
+}
 
 app.get('/api/products', (req, res) => {
     const sql = "SELECT * FROM products";
@@ -382,19 +432,47 @@ app.get('/api/orders', (req, res) => {
     }
 });
 
-app.post('/api/orders', async (req, res) => {
-    const { email, items, total, method } = req.body;
+app.post('/api/orders', upload.single('screenshot'), async (req, res) => {
+    const isMultipart = !!req.file || (req.headers['content-type'] || '').includes('multipart/form-data');
+    const body = req.body || {};
+    const email = body.email;
+    const items = body.items ? (isMultipart ? JSON.parse(body.items) : body.items) : [];
+    const total = body.total;
+    const method = body.method;
+    const customerName = body.customerName || body.name || null;
+    const address = body.address || null;
+    const contactNumber = body.contactNumber || null;
+    const piecesCount = body.piecesCount ? parseInt(body.piecesCount, 10) : null;
+    const colorPreferences = body.colorPreferences || null;
+    const screenshotUrl = req.file ? ('/uploads/' + req.file.filename) : null;
+    if (!email || typeof email !== 'string' || !email.trim()) {
+        return res.status(400).json({ error: 'Email is required' });
+    }
+    if (!Array.isArray(items) || items.length === 0) {
+        return res.status(400).json({ error: 'Items are required' });
+    }
+    const safeItems = items.map(it => ({
+        id: Number(it.id),
+        qty: Number(it.qty),
+        price: Number(it.price)
+    })).filter(it => it.id && it.qty && it.price >= 0);
+    if (safeItems.length === 0) {
+        return res.status(400).json({ error: 'Invalid items' });
+    }
+    const safeTotal = Number(total);
+    const payMethod = (method && typeof method === 'string') ? method : 'Unknown';
     if (usePg) {
         const client = await pgPool.connect();
         try {
             await client.query("BEGIN");
-            const r = await client.query("INSERT INTO orders (user_email, total_amount) VALUES ($1, $2) RETURNING id", [email, total]);
+            const r = await client.query("INSERT INTO orders (user_email, total_amount, customer_name, address, contact_number, pieces_count, color_preferences, screenshot_url) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id", [email.trim(), safeTotal, customerName, address, contactNumber, piecesCount, colorPreferences, screenshotUrl]);
             const orderId = r.rows[0].id;
-            for (const item of items) {
+            for (const item of safeItems) {
                 await client.query("INSERT INTO order_items (order_id, product_id, quantity, price_at_time) VALUES ($1, $2, $3, $4)", [orderId, item.id, item.qty, item.price]);
             }
-            await client.query("INSERT INTO payments (order_id, method, status, paid_amount, payer_email) VALUES ($1, $2, 'Pending', $3, $4)", [orderId, method || 'Unknown', total, email]);
+            await client.query("INSERT INTO payments (order_id, method, status, paid_amount, payer_email) VALUES ($1, $2, 'Pending', $3, $4)", [orderId, payMethod, safeTotal, email.trim()]);
             await client.query("COMMIT");
+            notifyOwnerEmail(orderId, { email: email.trim(), customerName, contactNumber, address, piecesCount, colorPreferences, total: safeTotal, method: payMethod }).catch(() => {});
             res.json({ success: true, orderId });
         } catch (err) {
             await client.query("ROLLBACK");
@@ -405,23 +483,24 @@ app.post('/api/orders', async (req, res) => {
     } else {
         db.serialize(() => {
             db.run("BEGIN");
-            db.run("INSERT INTO orders (user_email, total_amount) VALUES (?, ?)", [email, total], function(err) {
+            db.run("INSERT INTO orders (user_email, total_amount, customer_name, address, contact_number, pieces_count, color_preferences, screenshot_url) VALUES (?, ?, ?, ?, ?, ?, ?, ?)", [email.trim(), safeTotal, customerName, address, contactNumber, piecesCount, colorPreferences, screenshotUrl], function(err) {
                 if (err) {
                     db.run("ROLLBACK");
                     return res.status(500).json({ error: err.message });
                 }
                 const orderId = this.lastID;
                 const stmt = db.prepare("INSERT INTO order_items (order_id, product_id, quantity, price_at_time) VALUES (?, ?, ?, ?)");
-                items.forEach(item => {
+                safeItems.forEach(item => {
                     stmt.run(orderId, item.id, item.qty, item.price);
                 });
                 stmt.finalize();
-                db.run("INSERT INTO payments (order_id, method, status, paid_amount, payer_email) VALUES (?, ?, 'Pending', ?, ?)", [orderId, method || 'Unknown', total, email], function(payErr) {
+                db.run("INSERT INTO payments (order_id, method, status, paid_amount, payer_email) VALUES (?, ?, 'Pending', ?, ?)", [orderId, payMethod, safeTotal, email.trim()], function(payErr) {
                     if (payErr) {
                         db.run("ROLLBACK");
                         return res.status(500).json({ error: payErr.message });
                     }
                     db.run("COMMIT");
+                    notifyOwnerEmail(orderId, { email: email.trim(), customerName, contactNumber, address, piecesCount, colorPreferences, total: safeTotal, method: payMethod }).catch(() => {});
                     res.json({ success: true, orderId });
                 });
             });
@@ -447,3 +526,72 @@ app.get('/api/health', async (req, res) => {
 });
 
 app.listen(PORT, () => console.log(`Server: http://localhost:${PORT}`));
+ 
+// Extra Order Endpoints
+app.delete('/api/orders/:id', async (req, res) => {
+    const id = req.params.id;
+    if (usePg) {
+        pgPool.query("DELETE FROM orders WHERE id = $1", [id])
+            .then(() => res.json({ success: true }))
+            .catch(err => res.status(500).json({ error: err.message }));
+    } else {
+        db.serialize(() => {
+            db.run("BEGIN");
+            db.run("DELETE FROM order_items WHERE order_id = ?", [id]);
+            db.run("DELETE FROM payments WHERE order_id = ?", [id]);
+            db.run("DELETE FROM orders WHERE id = ?", [id], function(err) {
+                if (err) {
+                    db.run("ROLLBACK");
+                    return res.status(500).json({ error: err.message });
+                }
+                db.run("COMMIT");
+                res.json({ success: true });
+            });
+        });
+    }
+});
+
+app.put('/api/orders/:id/status', (req, res) => {
+    const id = req.params.id;
+    const status = (req.body && req.body.status) || null;
+    if (!status) return res.status(400).json({ error: 'Missing status' });
+    if (usePg) {
+        pgPool.query("UPDATE orders SET status = $1 WHERE id = $2", [status, id])
+            .then(() => res.json({ success: true }))
+            .catch(err => res.status(500).json({ error: err.message }));
+    } else {
+        db.run("UPDATE orders SET status = ? WHERE id = ?", [status, id], function(err) {
+            if (err) return res.status(500).json({ error: err.message });
+            res.json({ success: true });
+        });
+    }
+});
+
+app.post('/api/reviews', (req, res) => {
+    const { productId, name, rating, comment } = req.body || {};
+    if (!productId || !name || !rating) return res.status(400).json({ error: 'Missing fields' });
+    if (usePg) {
+        pgPool.query("INSERT INTO reviews (product_id, user_name, rating, comment, status) VALUES ($1, $2, $3, $4, 'Approved')", [productId, name, rating, comment || ''])
+            .then(() => res.json({ success: true }))
+            .catch(err => res.status(500).json({ error: err.message }));
+    } else {
+        db.run("INSERT INTO reviews (product_id, user_name, rating, comment, status) VALUES (?, ?, ?, ?, 'Approved')", [productId, name, rating, comment || ''], function(err) {
+            if (err) return res.status(500).json({ error: err.message });
+            res.json({ success: true });
+        });
+    }
+});
+
+app.get('/api/reviews/:productId', (req, res) => {
+    const pid = req.params.productId;
+    if (usePg) {
+        pgPool.query("SELECT id, user_name, rating, comment, created_at FROM reviews WHERE product_id = $1 AND status = 'Approved' ORDER BY created_at DESC", [pid])
+            .then(r => res.json(r.rows))
+            .catch(err => res.status(500).json({ error: err.message }));
+    } else {
+        db.all("SELECT id, user_name, rating, comment, created_at FROM reviews WHERE product_id = ? AND status = 'Approved' ORDER BY created_at DESC", [pid], (err, rows) => {
+            if (err) return res.status(500).json({ error: err.message });
+            res.json(rows || []);
+        });
+    }
+});

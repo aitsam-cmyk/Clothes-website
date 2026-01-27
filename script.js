@@ -7,8 +7,8 @@ let cart = [];
 let revealObserver = null;
 let selectedPaymentMethod = null;
 const PAYMENT_DETAILS = {
-    Easypaisa: { title: 'Easypaisa', account: '0345-0000000', name: 'Account Owner' },
-    JazzCash: { title: 'JazzCash', account: '0300-0000000', name: 'Account Owner' },
+    Easypaisa: { title: 'Easypaisa', account: '0300-1215152', name: 'Account Owner' },
+    JazzCash: { title: 'JazzCash', account: '0300-1215152', name: 'Account Owner' },
     'Credit/Debit Card': { title: 'Bank Transfer', account: '000123456789', bank: 'ABC Bank', name: 'Account Owner' }
 };
 try {
@@ -339,11 +339,72 @@ function showDetail(id) {
                 <button onclick="addToCart(${suit.id})">Add to Cart</button>
                 <button onclick="goHome()" style="background:#555;">Back</button>
             </div>
+            <div style="margin-top:20px; background:#222; padding:15px; border-radius:10px;">
+                <h3>Customer Reviews</h3>
+                <div id="reviewsList"></div>
+                <div style="margin-top:10px;">
+                    <input id="reviewName" placeholder="Your Name" style="width:100%; margin-bottom:8px;">
+                    <input id="reviewRating" type="number" min="1" max="5" placeholder="Rating (1-5)" style="width:100%; margin-bottom:8px;">
+                    <textarea id="reviewComment" placeholder="Write a review" style="width:100%; margin-bottom:8px;"></textarea>
+                    <button onclick="submitReview(${suit.id})">Submit Review</button>
+                </div>
+            </div>
         </div>
     `;
     showSection('detail');
+    loadReviews(suit.id);
 }
 
+async function loadReviews(productId) {
+    try {
+        const res = await fetch(`${API_URL}/reviews/${productId}`);
+        const reviews = await res.json();
+        const listEl = document.getElementById('reviewsList');
+        if (listEl) {
+            listEl.innerHTML = (Array.isArray(reviews) && reviews.length) ? reviews.map(r => `
+                <div class="cart-item">
+                    <div>
+                        <h4>${r.user_name} • ${r.rating}/5</h4>
+                        <p>${r.comment || ''}</p>
+                    </div>
+                </div>
+            `).join('') : '<p style="text-align:center; color:#aaa;">No reviews yet</p>';
+        }
+    } catch {}
+}
+
+async function submitReview(productId) {
+    const nameEl = document.getElementById('reviewName');
+    const ratingEl = document.getElementById('reviewRating');
+    const commentEl = document.getElementById('reviewComment');
+    if (!(nameEl instanceof HTMLInputElement) || !(ratingEl instanceof HTMLInputElement)) return;
+    const name = nameEl.value.trim();
+    const rating = parseInt(ratingEl.value, 10);
+    const comment = (commentEl instanceof HTMLTextAreaElement ? commentEl.value : '');
+    if (!name || isNaN(rating)) {
+        alert('Please fill name and rating');
+        return;
+    }
+    try {
+        const res = await fetch(`${API_URL}/reviews`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ productId, name, rating, comment })
+        });
+        const data = await res.json();
+        if (data.success) {
+            alert('Thanks for your review!');
+            loadReviews(productId);
+            nameEl.value = '';
+            ratingEl.value = '';
+            if (commentEl instanceof HTMLTextAreaElement) commentEl.value = '';
+        } else {
+            alert(data.error || 'Failed to submit review');
+        }
+    } catch {
+        alert('Server error');
+    }
+}
 async function submitNewSuit() {
     if (!isAdmin()) {
         alert('Admin required');
@@ -519,7 +580,7 @@ async function showAdminDashboard() {
         const listHtml = (Array.isArray(orders) ? orders : []).map(o => {
             revenue += Number(o.total) || 0;
             const items = (o.items || []).map(i => `${i.name} x ${i.qty}`).join(', ');
-            return `<div class="cart-item"><div><h4>Order #${o.id}</h4><p>${o.email} • ${new Date(o.date).toLocaleString()}</p><p>${items}</p></div><div>Rs. ${o.total}</div></div>`;
+            return `<div class="cart-item"><div><h4>Order #${o.id}</h4><p>${o.email} • ${new Date(o.date).toLocaleString()}</p><p>${items}</p><p>Status: ${o.status}</p></div><div>Rs. ${o.total}<div style="margin-top:8px;"><button onclick="markOrderReceived(${o.id})" style="margin-right:8px;">Mark Received</button><button onclick="deleteOrder(${o.id})" style="background:red;">Delete</button></div></div></div>`;
         }).join('');
         if (ordersEl) ordersEl.innerHTML = listHtml || '<p style="text-align:center; color:#aaa;">No orders</p>';
         if (totalOrdersEl) totalOrdersEl.textContent = String(totalOrders);
@@ -529,31 +590,97 @@ async function showAdminDashboard() {
     }
 }
 
+async function deleteOrder(id) {
+    if (!isAdmin()) {
+        alert('Admin required');
+        return;
+    }
+    if (!confirm('Delete this order?')) return;
+    try {
+        const res = await fetch(`${API_URL}/orders/${id}`, { method: 'DELETE' });
+        const data = await res.json();
+        if (data.success) {
+            alert('Order deleted');
+            showAdminDashboard();
+        } else {
+            alert(data.error || 'Delete failed');
+        }
+    } catch (e) {
+        alert('Server error');
+    }
+}
+
+async function markOrderReceived(id) {
+    if (!isAdmin()) {
+        alert('Admin required');
+        return;
+    }
+    try {
+        const res = await fetch(`${API_URL}/orders/${id}/status`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ status: 'Received' })
+        });
+        const data = await res.json();
+        if (data.success) {
+            showAdminDashboard();
+        } else {
+            alert(data.error || 'Update failed');
+        }
+    } catch (e) {
+        alert('Server error');
+    }
+}
+
 async function placeOrder() {
     if (cart.length === 0) {
         alert('Cart is empty');
         return;
     }
     const userStr = localStorage.getItem('user');
-    let email = '';
-    if (userStr) {
-        try {
-            const user = JSON.parse(userStr);
-            email = user.email || '';
-        } catch {}
+    const orderEmailEl = document.getElementById('orderEmail');
+    let email = (orderEmailEl instanceof HTMLInputElement && orderEmailEl.value) ? orderEmailEl.value.trim() : '';
+    if (!email) {
+        if (userStr) {
+            try {
+                const user = JSON.parse(userStr);
+                email = (user && user.email) ? String(user.email) : '';
+            } catch {}
+        }
     }
     if (!email) {
-        email = prompt('Enter email for order');
+        email = prompt('Enter customer email for order') || '';
+        email = email.trim();
         if (!email) return;
     }
     const total = cart.reduce((sum, i) => sum + i.price * i.qty, 0);
     const items = cart.map(i => ({ id: i.id, qty: i.qty, price: i.price }));
+    const nameEl = document.getElementById('orderName');
+    const addrEl = document.getElementById('orderAddress');
+    const contactEl = document.getElementById('orderContact');
+    const piecesEl = document.getElementById('orderPieces');
+    const colorsEl = document.getElementById('orderColors');
+    const shotEl = document.getElementById('orderScreenshot');
+    const customerName = (nameEl instanceof HTMLInputElement ? nameEl.value : '');
+    const address = (addrEl instanceof HTMLTextAreaElement ? addrEl.value : '');
+    const contact = (contactEl instanceof HTMLInputElement ? contactEl.value : '');
+    const pieces = (piecesEl instanceof HTMLInputElement ? piecesEl.value : '');
+    const colors = (colorsEl instanceof HTMLInputElement ? colorsEl.value : '');
     try {
-        const res = await fetch(`${API_URL}/orders`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ email, items, total, method: selectedPaymentMethod || 'Unknown' })
-        });
+        const fd = new FormData();
+        fd.append('email', email);
+        fd.append('items', JSON.stringify(items));
+        fd.append('total', String(total));
+        fd.append('method', selectedPaymentMethod || 'Unknown');
+        fd.append('customerName', customerName);
+        fd.append('address', address);
+        fd.append('contactNumber', contact);
+        fd.append('piecesCount', String(pieces || ''));
+        fd.append('colorPreferences', colors);
+        if (shotEl instanceof HTMLInputElement && shotEl.files && shotEl.files[0]) {
+            fd.append('screenshot', shotEl.files[0]);
+        }
+        const res = await fetch(`${API_URL}/orders`, { method: 'POST', body: fd });
         const data = await res.json();
         if (data.success) {
             alert(`Order placed. ID: ${data.orderId}`);
