@@ -70,6 +70,18 @@
             <button onclick="pay(this,'Credit/Debit Card')">Credit/Debit Card</button>
         </div>
         <div id="paymentInfo" style="margin-top:10px; background:#1a1a1a; padding:15px; border-radius:10px; display:none;"></div>
+        <div style="margin-top:15px; background:#222; padding:15px; border-radius:10px;">
+            <h3 style="margin-bottom:10px;">Order Details</h3>
+            <input id="orderEmail" type="email" placeholder="Customer Email" style="width:100%; margin-bottom:8px;">
+            <input id="orderName" placeholder="Full Name" style="width:100%; margin-bottom:8px;">
+            <input id="orderContact" placeholder="Contact Number" style="width:100%; margin-bottom:8px;">
+            <textarea id="orderAddress" placeholder="Address" style="width:100%; margin-bottom:8px;"></textarea>
+            <input id="orderPieces" type="number" placeholder="How many pieces" style="width:100%; margin-bottom:8px;">
+            <input id="orderColors" placeholder="Which colours you want" style="width:100%; margin-bottom:8px;">
+            <label style="display:block; margin:8px 0;">Upload Transaction Screenshot:
+                <input id="orderScreenshot" type="file" accept="image/*">
+            </label>
+        </div>
         <button style="margin-top:20px; width:100%; padding:15px; background:#28a745; color:white; border:none; border-radius:8px; cursor:pointer; font-size:16px; font-weight:bold;" onclick="placeOrder()">Place Order</button>
     </section>
 
@@ -185,7 +197,7 @@
 
         <div>
             <h3>Contact</h3>
-            <a href="mailto:zell@gmail.com"><i class="fas fa-envelope"></i> zell@gmail.com</a>
+            <a href="mailto:zellburyofficial3@gmail.com"><i class="fas fa-envelope"></i> zellburyofficial3@gmail.com</a>
             <a href="tel:+923001215152"><i class="fas fa-phone"></i> +92 3001215152</a>
             <button onclick="alert('Thank you for your feedback!')" style="margin-top:10px; color:#ff66b2;">Give Feedback</button>
         </div>

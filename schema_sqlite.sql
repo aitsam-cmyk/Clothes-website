@@ -31,7 +31,13 @@ CREATE TABLE IF NOT EXISTS orders (
     user_email TEXT NOT NULL,
     total_amount REAL NOT NULL,
     status TEXT DEFAULT 'Pending',
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    customer_name TEXT,
+    address TEXT,
+    contact_number TEXT,
+    pieces_count INTEGER,
+    color_preferences TEXT,
+    screenshot_url TEXT
 );
 
 -- Order Items Table
@@ -56,6 +62,18 @@ CREATE TABLE IF NOT EXISTS payments (
     payer_email TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY(order_id) REFERENCES orders(id) ON DELETE CASCADE
+);
+
+-- Reviews Table
+CREATE TABLE IF NOT EXISTS reviews (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    product_id INTEGER,
+    user_name TEXT,
+    rating INTEGER,
+    comment TEXT,
+    status TEXT DEFAULT 'Approved',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY(product_id) REFERENCES products(id) ON DELETE SET NULL
 );
 
 -- Insert Default Admins
