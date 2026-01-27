@@ -5,6 +5,7 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
+
 function isValidPgUrl(u) {
     if (!u) return false;
     try {
@@ -17,6 +18,7 @@ function isValidPgUrl(u) {
         return false;
     }
 }
+
 const usePg = isValidPgUrl(process.env.DATABASE_URL);
 let db = null;
 let pgPool = null;
@@ -52,8 +54,6 @@ async function ensurePgPool() {
 }
 
 if (usePg) {
-    const { Pool } = require('pg');
-    // try to init immediately; will retry in health if DNS error occurs
     (async () => { await ensurePgPool(); })();
     function initPg() {
         const queries = [
@@ -65,11 +65,7 @@ if (usePg) {
             "CREATE TABLE IF NOT EXISTS payments (id SERIAL PRIMARY KEY, order_id INTEGER REFERENCES orders(id) ON DELETE CASCADE, method TEXT, status TEXT DEFAULT 'Pending', paid_amount NUMERIC(10,2), transaction_id TEXT, payer_email TEXT, created_at TIMESTAMP DEFAULT NOW())",
             "INSERT INTO users (name, email, password, role) VALUES ('Admin1', 'zellburyofficial3@gmail.com', 'farnaz90', 'admin') ON CONFLICT (email) DO NOTHING",
             "INSERT INTO users (name, email, password, role) VALUES ('Admin2', 'jasimkhan5917@gmail.com', '@Jasimkhan5917', 'admin') ON CONFLICT (email) DO NOTHING",
-            "INSERT INTO users (name, email, password, role) VALUES ('Admin3', 'admin@store.com', 'admin123', 'admin') ON CONFLICT (email) DO NOTHING",
-            "INSERT INTO products (name, price, description, category, image_url) VALUES ('Ladies Suit 1', 5100, 'Beautiful suit for ladies', 'suits', '/placeholder.svg') ON CONFLICT (name) DO NOTHING",
-            "INSERT INTO products (name, price, description, category, image_url) VALUES ('Ladies Suit 2', 5200, 'Beautiful suit for ladies', 'suits', '/placeholder.svg') ON CONFLICT (name) DO NOTHING",
-            "INSERT INTO products (name, price, description, category, image_url) VALUES ('Ladies Suit 3', 5300, 'Beautiful suit for ladies', 'suits', '/placeholder.svg') ON CONFLICT (name) DO NOTHING",
-            "INSERT INTO products (name, price, description, category, image_url) VALUES ('Ladies Suit 4', 5400, 'Beautiful suit for ladies', 'suits', '/placeholder.svg') ON CONFLICT (name) DO NOTHING"
+            "INSERT INTO users (name, email, password, role) VALUES ('Admin3', 'admin@store.com', 'admin123', 'admin') ON CONFLICT (email) DO NOTHING"
         ];
         queries.reduce((p, sql) => p.then(() => pgPool.query(sql)), Promise.resolve()).catch(() => {});
     }
@@ -109,7 +105,7 @@ function verifyPassword(pw, stored) {
 }
 
 function migratePasswords() {
-    if (usePg) {
+    if (usePg && pgPool) {
         pgPool.query("SELECT id, password FROM users").then(res => {
             res.rows.forEach(row => {
                 if (row.password && !row.password.startsWith('pbkdf2$')) {
@@ -118,7 +114,7 @@ function migratePasswords() {
                 }
             });
         }).catch(() => {});
-    } else {
+    } else if (db) {
         db.all("SELECT id, password FROM users", [], (err, rows) => {
             if (err || !rows) return;
             rows.forEach(row => {
@@ -130,8 +126,7 @@ function migratePasswords() {
         });
     }
 }
-
-migratePasswords();
+setTimeout(migratePasswords, 2000);
 
 const storage = multer.diskStorage({
     destination: (req, file, cb) => cb(null, uploadDir),
@@ -139,18 +134,7 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage: storage });
 
-if (!usePg) {
-    db.run(`CREATE TABLE IF NOT EXISTS payments (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        order_id INTEGER,
-        method TEXT,
-        status TEXT DEFAULT 'Pending',
-        paid_amount REAL,
-        transaction_id TEXT,
-        payer_email TEXT,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    )`);
-}
+// API Routes
 app.post('/api/login', (req, res) => {
     const { email, password } = req.body;
     if (usePg) {
@@ -197,15 +181,16 @@ app.post('/api/signup', (req, res) => {
 
 app.get('/api/products', (req, res) => {
     const sql = "SELECT * FROM products";
+    const base = `${req.protocol}://${req.get('host')}`;
     if (usePg) {
         Promise.all([
             pgPool.query(sql),
             pgPool.query("SELECT product_id, url FROM product_images")
         ]).then(([pr, ir]) => {
-            const base = `${req.protocol}://${req.get('host')}`;
             const imgMap = {};
             ir.rows.forEach(row => {
-                (imgMap[row.product_id] = imgMap[row.product_id] || []).push(row.url);
+                if (!imgMap[row.product_id]) imgMap[row.product_id] = [];
+                imgMap[row.product_id].push(row.url);
             });
             const products = pr.rows.map(p => {
                 const imgs = imgMap[p.id] || [];
@@ -216,14 +201,14 @@ app.get('/api/products', (req, res) => {
             res.json(products);
         }).catch(err => res.status(500).json({ error: err.message }));
     } else {
-        const base = `${req.protocol}://${req.get('host')}`;
         db.all(sql, [], (err, rows) => {
             if (err) return res.status(500).json({ error: err.message });
             db.all("SELECT product_id, url FROM product_images", [], (e2, imgs) => {
                 if (e2) return res.status(500).json({ error: e2.message });
                 const map = {};
                 imgs.forEach(r => {
-                    (map[r.product_id] = map[r.product_id] || []).push(r.url);
+                    if (!map[r.product_id]) map[r.product_id] = [];
+                    map[r.product_id].push(r.url);
                 });
                 const products = rows.map(p => {
                     const list = (map[p.id] || []);
@@ -239,21 +224,22 @@ app.get('/api/products', (req, res) => {
 
 app.post('/api/products', upload.array('images'), (req, res) => {
     const { name, price, desc, image_url } = req.body;
+    const files = req.files;
     let imageUrl = image_url || 'https://via.placeholder.com/400';
-    if (req.files && req.files.length > 0) {
-        imageUrl = '/uploads/' + req.files[0].filename;
+    
+    if (Array.isArray(files) && files.length > 0) {
+        imageUrl = '/uploads/' + files[0].filename;
     }
+
     if (usePg) {
         const sql = "INSERT INTO products (name, price, description, category, image_url) VALUES ($1, $2, $3, 'suits', $4) RETURNING id";
         pgPool.query(sql, [name, price, desc, imageUrl]).then(async r => {
             const id = r.rows[0].id;
-            if (req.files && req.files.length > 0) {
-                for (let i = 0; i < req.files.length; i++) {
-                    const url = '/uploads/' + req.files[i].filename;
+            if (Array.isArray(files) && files.length > 0) {
+                for (const file of files) {
+                    const url = '/uploads/' + file.filename;
                     await pgPool.query("INSERT INTO product_images (product_id, url) VALUES ($1, $2)", [id, url]);
                 }
-            } else if (imageUrl) {
-                await pgPool.query("INSERT INTO product_images (product_id, url) VALUES ($1, $2)", [id, imageUrl]);
             }
             res.json({ success: true, id });
         }).catch(err => res.status(500).json({ error: err.message }));
@@ -261,12 +247,11 @@ app.post('/api/products', upload.array('images'), (req, res) => {
         db.run("INSERT INTO products (name, price, description, category, image_url) VALUES (?, ?, ?, 'suits', ?)", [name, price, desc, imageUrl], function(err) {
             if (err) return res.status(500).json({ error: err.message });
             const id = this.lastID;
-            if (req.files && req.files.length > 0) {
+            if (Array.isArray(files) && files.length > 0) {
                 const stmt = db.prepare("INSERT INTO product_images (product_id, url) VALUES (?, ?)");
-                for (let i = 0; i < req.files.length; i++) {
-                    const url = '/uploads/' + req.files[i].filename;
-                    stmt.run(id, url);
-                }
+                files.forEach(file => {
+                    stmt.run(id, '/uploads/' + file.filename);
+                });
                 stmt.finalize();
             }
             res.json({ success: true, id });
@@ -277,19 +262,21 @@ app.post('/api/products', upload.array('images'), (req, res) => {
 app.put('/api/products/:id', upload.array('images'), (req, res) => {
     const { name, price, desc, image_url } = req.body;
     const id = req.params.id;
+    const files = req.files;
+    const hasFiles = Array.isArray(files) && files.length > 0;
+
     if (usePg) {
         let sql = "UPDATE products SET name = $1, price = $2, description = $3 WHERE id = $4";
         let params = [name, price, desc, id];
-        if ((req.files && req.files.length > 0) || image_url) {
-            const img = (req.files && req.files.length > 0) ? ('/uploads/' + req.files[0].filename) : image_url;
+        if (hasFiles || image_url) {
+            const img = hasFiles ? ('/uploads/' + files[0].filename) : image_url;
             sql = "UPDATE products SET name = $1, price = $2, description = $3, image_url = $4 WHERE id = $5";
             params = [name, price, desc, img, id];
         }
         pgPool.query(sql, params).then(async () => {
-            if (req.files && req.files.length > 1) {
-                for (let i = 1; i < req.files.length; i++) {
-                    const url = '/uploads/' + req.files[i].filename;
-                    await pgPool.query("INSERT INTO product_images (product_id, url) VALUES ($1, $2)", [id, url]);
+            if (Array.isArray(files) && files.length > 1) {
+                for (let i = 1; i < files.length; i++) {
+                    await pgPool.query("INSERT INTO product_images (product_id, url) VALUES ($1, $2)", [id, '/uploads/' + files[i].filename]);
                 }
             }
             res.json({ success: true });
@@ -297,18 +284,17 @@ app.put('/api/products/:id', upload.array('images'), (req, res) => {
     } else {
         let sql = "UPDATE products SET name = ?, price = ?, description = ? WHERE id = ?";
         let params = [name, price, desc, id];
-        if (req.files && req.files.length > 0) {
-            const imageUrl = '/uploads/' + req.files[0].filename;
+        if (hasFiles) {
+            const imageUrl = '/uploads/' + files[0].filename;
             sql = "UPDATE products SET name = ?, price = ?, description = ?, image_url = ? WHERE id = ?";
             params = [name, price, desc, imageUrl, id];
         }
         db.run(sql, params, function(err) {
             if (err) return res.status(500).json({ error: err.message });
-            if (req.files && req.files.length > 1) {
+            if (Array.isArray(files) && files.length > 1) {
                 const stmt = db.prepare("INSERT INTO product_images (product_id, url) VALUES (?, ?)");
-                for (let i = 1; i < req.files.length; i++) {
-                    const url = '/uploads/' + req.files[i].filename;
-                    stmt.run(id, url);
+                for (let i = 1; i < files.length; i++) {
+                    stmt.run(id, '/uploads/' + files[i].filename);
                 }
                 stmt.finalize();
             }
@@ -320,11 +306,46 @@ app.put('/api/products/:id', upload.array('images'), (req, res) => {
 app.delete('/api/products/:id', (req, res) => {
     const id = req.params.id;
     if (usePg) {
-        pgPool.query("DELETE FROM products WHERE id = $1", [id]).then(() => res.json({ success: true })).catch(err => res.status(500).json({ error: err.message }));
+        (async () => {
+            const client = await pgPool.connect();
+            try {
+                await client.query("BEGIN");
+                const chk = await client.query("SELECT COUNT(*) AS cnt FROM order_items WHERE product_id = $1", [id]);
+                const cnt = parseInt(chk.rows[0].cnt, 10) || 0;
+                if (cnt > 0) {
+                    await client.query("ROLLBACK");
+                    return res.status(400).json({ error: "Cannot delete product with existing order items" });
+                }
+                await client.query("DELETE FROM product_images WHERE product_id = $1", [id]);
+                await client.query("DELETE FROM products WHERE id = $1", [id]);
+                await client.query("COMMIT");
+                res.json({ success: true });
+            } catch (err) {
+                await client.query("ROLLBACK");
+                res.status(500).json({ error: err.message });
+            } finally {
+                client.release();
+            }
+        })();
     } else {
-        db.run("DELETE FROM products WHERE id = ?", [id], function(err) {
-            if (err) return res.status(500).json({ error: err.message });
-            res.json({ success: true });
+        db.get("SELECT COUNT(*) AS cnt FROM order_items WHERE product_id = ?", [id], (e, row) => {
+            if (e) return res.status(500).json({ error: e.message });
+            const cnt = (row && row.cnt) || 0;
+            if (cnt > 0) {
+                return res.status(400).json({ error: "Cannot delete product with existing order items" });
+            }
+            db.serialize(() => {
+                db.run("BEGIN");
+                db.run("DELETE FROM product_images WHERE product_id = ?", [id]);
+                db.run("DELETE FROM products WHERE id = ?", [id], function(err) {
+                    if (err) {
+                        db.run("ROLLBACK");
+                        return res.status(500).json({ error: err.message });
+                    }
+                    db.run("COMMIT");
+                    res.json({ success: true });
+                });
+            });
         });
     }
 });
@@ -408,39 +429,13 @@ app.post('/api/orders', async (req, res) => {
     }
 });
 
-app.get('/api/payments', (req, res) => {
-    const sql = "SELECT p.*, o.user_email as order_user, o.total_amount as order_total FROM payments p LEFT JOIN orders o ON p.order_id = o.id ORDER BY p.created_at DESC";
-    if (usePg) {
-        pgPool.query(sql).then(r => res.json(r.rows)).catch(err => res.status(500).json({ error: err.message }));
-    } else {
-        db.all(sql, [], (err, rows) => {
-            if (err) return res.status(500).json({ error: err.message });
-            res.json(rows);
-        });
-    }
-});
-
 app.get('/api/health', async (req, res) => {
     if (usePg) {
         try {
-            if (!pgPool) {
-                const ok = await ensurePgPool();
-                if (!ok) throw new Error('pg init failed');
-            }
+            if (!pgPool) await ensurePgPool();
             const r = await pgPool.query('SELECT 1 as ok');
             return res.json({ db: 'postgres', ok: !!(r.rows && r.rows[0] && r.rows[0].ok) });
         } catch (e) {
-            if ((e.message || '').includes('EAI_AGAIN')) {
-                const tried = await ensurePgPool();
-                if (tried) {
-                    try {
-                        const r2 = await pgPool.query('SELECT 1 as ok');
-                        return res.json({ db: 'postgres', ok: !!(r2.rows && r2.rows[0] && r2.rows[0].ok), url: pgUrlInUse });
-                    } catch (e2) {
-                        return res.status(500).json({ db: 'postgres', error: e2.message });
-                    }
-                }
-            }
             return res.status(500).json({ db: 'postgres', error: e.message });
         }
     } else {
