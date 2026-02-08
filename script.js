@@ -666,6 +666,10 @@ async function placeOrder() {
         alert('Cart is empty');
         return;
     }
+    if (!selectedPaymentMethod || selectedPaymentMethod === 'Unknown') {
+        alert('Please select a payment method');
+        return;
+    }
     const userStr = localStorage.getItem('user');
     const orderEmailEl = document.getElementById('orderEmail');
     let email = (orderEmailEl instanceof HTMLInputElement && orderEmailEl.value) ? orderEmailEl.value.trim() : '';
@@ -695,6 +699,16 @@ async function placeOrder() {
     const contact = (contactEl instanceof HTMLInputElement ? contactEl.value : '');
     const pieces = (piecesEl instanceof HTMLInputElement ? piecesEl.value : '');
     const colors = (colorsEl instanceof HTMLInputElement ? colorsEl.value : '');
+    if (!customerName || !address || !contact || !pieces || !colors || !email) {
+        alert('Please fill all order details');
+        return;
+    }
+    if ((selectedPaymentMethod === 'JazzCash' || selectedPaymentMethod === 'Credit/Debit Card')) {
+        if (!(shotEl instanceof HTMLInputElement && shotEl.files && shotEl.files[0])) {
+            alert('Transaction screenshot is required for JazzCash/Bank payments');
+            return;
+        }
+    }
     try {
         const fd = new FormData();
         fd.append('email', email);

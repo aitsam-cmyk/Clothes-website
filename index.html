@@ -81,13 +81,13 @@
         <div id="paymentInfo" style="margin-top:10px; background:#1a1a1a; padding:15px; border-radius:10px; display:none;"></div>
         <div style="margin-top:15px; background:#222; padding:15px; border-radius:10px;">
             <h3 style="margin-bottom:10px;">Order Details</h3>
-            <input id="orderEmail" type="email" placeholder="Customer Email" style="width:100%; margin-bottom:8px;">
-            <input id="orderName" placeholder="Full Name" style="width:100%; margin-bottom:8px;">
-            <input id="orderContact" placeholder="Contact Number" style="width:100%; margin-bottom:8px;">
-            <textarea id="orderAddress" placeholder="Address" style="width:100%; margin-bottom:8px;"></textarea>
-            <input id="orderPieces" type="number" placeholder="How many pieces" style="width:100%; margin-bottom:8px;">
-            <input id="orderColors" placeholder="Which colours you want" style="width:100%; margin-bottom:8px;">
-            <label style="display:block; margin:8px 0;">Upload Transaction Screenshot:
+            <input id="orderEmail" type="email" placeholder="Customer Email" style="width:100%; margin-bottom:8px;" required>
+            <input id="orderName" placeholder="Full Name" style="width:100%; margin-bottom:8px;" required>
+            <input id="orderContact" placeholder="Contact Number" style="width:100%; margin-bottom:8px;" required>
+            <textarea id="orderAddress" placeholder="Address" style="width:100%; margin-bottom:8px;" required></textarea>
+            <input id="orderPieces" type="number" placeholder="How many pieces" style="width:100%; margin-bottom:8px;" required>
+            <input id="orderColors" placeholder="Which colours you want" style="width:100%; margin-bottom:8px;" required>
+            <label style="display:block; margin:8px 0;">Upload Transaction Screenshot (Required for JazzCash/Bank):
                 <input id="orderScreenshot" type="file" accept="image/*">
             </label>
         </div>
