@@ -270,7 +270,7 @@ function renderProducts(items) {
 
     container.innerHTML = items.map(p => `
         <div class="card reveal">
-            <img src="${(Array.isArray(p.images) && p.images[0]) || p.image_url}" alt="${p.name}">
+            <img src="${(Array.isArray(p.images) && p.images[0]) || p.image_url}" alt="${p.name}" loading="lazy" decoding="async" />
             <h3>${p.name}</h3>
             <p>Rs. ${p.price}</p>
             <button onclick="addToCart(${p.id})">Add to Cart</button>
@@ -587,7 +587,29 @@ async function showAdminDashboard() {
         const listHtml = (Array.isArray(orders) ? orders : []).map(o => {
             revenue += Number(o.total) || 0;
             const items = (o.items || []).map(i => `${i.name} x ${i.qty}`).join(', ');
-            return `<div class="cart-item"><div><h4>Order #${o.id}</h4><p>${o.email} • ${new Date(o.date).toLocaleString()}</p><p>${items}</p><p>Status: ${o.status}</p></div><div>Rs. ${o.total}<div style="margin-top:8px;"><button onclick="markOrderReceived(${o.id})" style="margin-right:8px;">Mark Received</button><button onclick="deleteOrder(${o.id})" style="background:red;">Delete</button></div></div></div>`;
+            const details = [
+                `Name: ${o.customer_name || '-'}`,
+                `Contact: ${o.contact_number || '-'}`,
+                `Address: ${o.address || '-'}`,
+                `Method: ${o.method || '-'}`,
+                `Pieces: ${o.pieces_count ?? '-'}`,
+                `Colors: ${o.color_preferences || '-'}`
+            ].join(' • ');
+            return `<div class="cart-item">
+                        <div>
+                            <h4>Order #${o.id}</h4>
+                            <p>${o.email} • ${new Date(o.date).toLocaleString()}</p>
+                            <p>${items}</p>
+                            <p>${details}</p>
+                            <p>Status: ${o.status}</p>
+                        </div>
+                        <div>Rs. ${o.total}
+                            <div style="margin-top:8px;">
+                                <button onclick="markOrderReceived(${o.id})" style="margin-right:8px;">Mark Received</button>
+                                <button onclick="deleteOrder(${o.id})" style="background:red;">Delete</button>
+                            </div>
+                        </div>
+                    </div>`;
         }).join('');
         if (ordersEl) ordersEl.innerHTML = listHtml || '<p style="text-align:center; color:#aaa;">No orders</p>';
         if (totalOrdersEl) totalOrdersEl.textContent = String(totalOrders);

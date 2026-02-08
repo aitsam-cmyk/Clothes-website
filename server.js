@@ -402,13 +402,27 @@ app.delete('/api/products/:id', (req, res) => {
 });
 
 app.get('/api/orders', (req, res) => {
-    const sql = "SELECT o.*, oi.product_id, p.name as product_name, oi.quantity FROM orders o LEFT JOIN order_items oi ON o.id = oi.order_id LEFT JOIN products p ON oi.product_id = p.id";
+    const sql = "SELECT o.*, oi.product_id, p.name as product_name, oi.quantity, pay.method as payment_method FROM orders o LEFT JOIN order_items oi ON o.id = oi.order_id LEFT JOIN products p ON oi.product_id = p.id LEFT JOIN payments pay ON pay.order_id = o.id";
     if (usePg) {
         pgPool.query(sql).then(r => {
             const ordersMap = {};
             r.rows.forEach(row => {
                 if (!ordersMap[row.id]) {
-                    ordersMap[row.id] = { id: row.id, email: row.user_email, total: row.total_amount, date: row.created_at, status: row.status, items: [] };
+                    ordersMap[row.id] = { 
+                        id: row.id, 
+                        email: row.user_email, 
+                        total: row.total_amount, 
+                        date: row.created_at, 
+                        status: row.status, 
+                        customer_name: row.customer_name,
+                        address: row.address,
+                        contact_number: row.contact_number,
+                        pieces_count: row.pieces_count,
+                        color_preferences: row.color_preferences,
+                        screenshot_url: row.screenshot_url,
+                        method: row.payment_method,
+                        items: [] 
+                    };
                 }
                 if (row.product_id) {
                     ordersMap[row.id].items.push({ name: row.product_name, qty: row.quantity });
@@ -422,7 +436,21 @@ app.get('/api/orders', (req, res) => {
             const ordersMap = {};
             rawRows.forEach(row => {
                 if (!ordersMap[row.id]) {
-                    ordersMap[row.id] = { id: row.id, email: row.user_email, total: row.total_amount, date: row.created_at, status: row.status, items: [] };
+                    ordersMap[row.id] = { 
+                        id: row.id, 
+                        email: row.user_email, 
+                        total: row.total_amount, 
+                        date: row.created_at, 
+                        status: row.status, 
+                        customer_name: row.customer_name,
+                        address: row.address,
+                        contact_number: row.contact_number,
+                        pieces_count: row.pieces_count,
+                        color_preferences: row.color_preferences,
+                        screenshot_url: row.screenshot_url,
+                        method: row.payment_method,
+                        items: [] 
+                    };
                 }
                 if (row.product_id) {
                     ordersMap[row.id].items.push({ name: row.product_name, qty: row.quantity });
