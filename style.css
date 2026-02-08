@@ -144,13 +144,13 @@ header .dropdown button:hover {
 #banner {
     width: 100%;
     height: 350px;
-    background: linear-gradient(135deg, #111, #333);
+    background: #fff;
     display: flex;
     justify-content: center;
     align-items: center;
     font-size: 50px;
     font-weight: 800;
-    text-shadow: 0 0 20px #ff66b2;
+    color: #333;
     letter-spacing: 2px;
     animation: slideDown 0.8s ease-out;
 }
