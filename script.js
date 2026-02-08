@@ -1,15 +1,16 @@
 // ===== Configuration =====
-const DEFAULT_API = 'https://aitsam916-clothes-backend.hf.space/api';
-const API_URL = localStorage.getItem('API_URL') || DEFAULT_API;
+const LOCAL_API = 'http://localhost:3000/api';
+const REMOTE_API = 'https://aitsam916-clothes-backend.hf.space/api'; // Update this with your new Hugging Face URL if it changes
+const API_URL = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') ? LOCAL_API : REMOTE_API;
 
 let products = [];
 let cart = [];
 let revealObserver = null;
 let selectedPaymentMethod = null;
 const PAYMENT_DETAILS = {
-    Easypaisa: { title: 'Easypaisa', account: '0300-1215152', name: 'Account Owner' },
     JazzCash: { title: 'JazzCash', account: '0300-1215152', name: 'Account Owner' },
-    'Credit/Debit Card': { title: 'Bank Transfer', account: '000123456789', bank: 'ABC Bank', name: 'Account Owner' }
+    'Credit/Debit Card': { title: 'Bank Transfer', account: '000123456789', bank: 'ABC Bank', name: 'Account Owner' },
+    'Cash on Delivery': { title: 'Cash on Delivery', account: '', name: 'Pay at Doorstep' }
 };
 try {
     const override = localStorage.getItem('PAYMENT_INFO');
@@ -683,7 +684,7 @@ async function placeOrder() {
         const res = await fetch(`${API_URL}/orders`, { method: 'POST', body: fd });
         const data = await res.json();
         if (data.success) {
-            alert(`Order placed. ID: ${data.orderId}`);
+            alert(`Order placed successfully! ID: ${data.orderId}\n\nFor any queries, contact Owner:\nMobile: 0300-1215152\nEmail: zellburyofficial3@gmail.com`);
             cart = [];
             renderCart();
             showSection('home');

@@ -1,3 +1,12 @@
+---
+title: Clothes Website
+emoji: 👗
+colorFrom: pink
+colorTo: purple
+sdk: docker
+pinned: false
+---
+
 # Clothes Website with Admin Panel
 
 This is a professional e-commerce website with a complete backend, SQL database, and role-based access control (Admin vs Customer).
