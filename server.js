@@ -246,8 +246,8 @@ app.get('/api/products', (req, res) => {
             const products = pr.rows.map(p => {
                 const imgs = imgMap[p.id] || [];
                 const list = p.image_url ? [p.image_url, ...imgs] : imgs;
-                const absList = list.map(u => u && u.startsWith('/') ? (base + u) : u).filter(Boolean);
-                return { ...p, images: absList.length ? absList : [base + '/placeholder.svg'] };
+                const absList = list.map(u => u && u.startsWith('/') ? (`https://aitsam916-clothes-backend.hf.space${u}`) : u).filter(Boolean);
+                return { ...p, images: absList.length ? absList : [`https://aitsam916-clothes-backend.hf.space/placeholder.svg`] };
             });
             res.json(products);
         }).catch(err => res.status(500).json({ error: err.message }));
