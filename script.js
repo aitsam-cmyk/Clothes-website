@@ -430,35 +430,28 @@ async function submitNewSuit() {
         return;
     }
     
-    // Upload images to Cloudinary first
-    const cloudinaryUrls = [];
-    if (filesEl.files && filesEl.files.length > 0) {
-        for (let i = 0; i < filesEl.files.length; i++) {
-            const uploadResult = await uploadToCloudinary(filesEl.files[i]);
-            if (uploadResult && uploadResult.url) {
-                cloudinaryUrls.push(uploadResult.url);
-            }
-        }
-    }
-    
-    // Create product with Cloudinary URLs
+    // Create product with form data (images handled by server)
     const fd = new FormData();
     fd.append('name', name);
     fd.append('price', String(price));
     fd.append('desc', desc);
     
-    // Add Cloudinary URLs as images
-    if (cloudinaryUrls.length > 0) {
-        // Add the first image as main image
-        fd.append('image_url', cloudinaryUrls[0]);
-        // Add all URLs as additional images
-        cloudinaryUrls.forEach((url, index) => {
-            fd.append('images', url);
-        });
+    // Append files directly to FormData
+    if (filesEl.files && filesEl.files.length > 0) {
+        for (let i = 0; i < filesEl.files.length; i++) {
+            fd.append('images', filesEl.files[i]);
+        }
     }
     
     try {
-        const res = await fetch(`${API_URL}/products`, { method: 'POST', body: fd });
+        const res = await fetch(`${API_URL}/products`, { 
+            method: 'POST', 
+            headers: {
+                'Authorization': `Bearer ${getAuthToken()}`,
+                'X-Access-Token': getAuthToken()
+            },
+            body: fd 
+        });
         const data = await res.json();
         if (data.success) {
             alert('Product added with Cloudinary images');
@@ -540,34 +533,26 @@ async function submitEditSuit() {
     }
     let res;
     try {
+        const fd = new FormData();
+        fd.append('name', name);
+        fd.append('price', String(price));
+        fd.append('desc', desc);
+
+        // Check if new files are selected
         if (filesEl.files && filesEl.files.length > 0) {
-            // Upload images to Cloudinary first
-            const cloudinaryUrls = [];
-            for (let i = 0; i < filesEl.files.length; i++) {
-                const uploadResult = await uploadToCloudinary(filesEl.files[i]);
-                if (uploadResult && uploadResult.url) {
-                    cloudinaryUrls.push(uploadResult.url);
-                }
+             for (let i = 0; i < filesEl.files.length; i++) {
+                fd.append('images', filesEl.files[i]);
             }
-            
-            const fd = new FormData();
-            fd.append('name', name);
-            fd.append('price', String(price));
-            fd.append('desc', desc);
-            
-            // Add Cloudinary URLs as images
-            cloudinaryUrls.forEach(url => {
-                fd.append('images', url);
-            });
-            
-            res = await fetch(`${API_URL}/products/${id}`, { method: 'PUT', body: fd });
-        } else {
-            res = await fetch(`${API_URL}/products/${id}`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ name, price, desc })
-            });
         }
+
+        res = await fetch(`${API_URL}/products/${id}`, { 
+            method: 'PUT', 
+            headers: {
+                'Authorization': `Bearer ${getAuthToken()}`,
+                'X-Access-Token': getAuthToken()
+            },
+            body: fd 
+        });
         const data = await res.json();
         if (data.success) {
             alert('Updated');
@@ -847,205 +832,3 @@ function getAuthToken() {
     }
 }
 
-// Upload image directly to Cloudinary (Admin only)
-async function uploadToCloudinary(file) {
-    const token = getAuthToken();
-    if (!token) {
-        alert('Please login as admin');
-        return null;
-    }
-    
-    const formData = new FormData();
-    formData.append('image', file);
-    
-    try {
-        const res = await fetch(`${API_URL}/admin/cloudinary/upload`, {
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${token}`,
-                'X-Access-Token': token
-            },
-            body: formData
-        });
-        
-        const data = await res.json();
-        if (data.success) {
-            return data;
-        } else {
-            alert('Upload failed: ' + (data.error || 'Unknown error'));
-            return null;
-        }
-    } catch (error) {
-        alert('Upload error: ' + error.message);
-        return null;
-    }
-}
-
-// Delete image from Cloudinary (Admin only)
-async function deleteFromCloudinary(publicId) {
-    const token = getAuthToken();
-    if (!token) {
-        alert('Please login as admin');
-        return false;
-    }
-    
-    if (!confirm('Delete this image from Cloudinary?')) return false;
-    
-    // Ensure publicId is a string type
-    const strPublicId = String(publicId);
-    
-    try {
-        const res = await fetch(`${API_URL}/admin/cloudinary/delete`, {
-            method: 'DELETE',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`,
-                'X-Access-Token': token
-            },
-            body: JSON.stringify({ publicId: strPublicId })
-        });
-        
-        const data = await res.json();
-        if (data.success) {
-            alert('Image deleted successfully');
-            return true;
-        } else {
-            alert('Delete failed: ' + (data.error || 'Unknown error'));
-            return false;
-        }
-    } catch (error) {
-        alert('Delete error: ' + error.message);
-        return false;
-    }
-}
-
-// Get Cloudinary images list (Admin only)
-async function getCloudinaryImages() {
-    const token = getAuthToken();
-    if (!token) {
-        alert('Please login as admin');
-        return [];
-    }
-    
-    try {
-        const res = await fetch(`${API_URL}/admin/cloudinary/images`, {
-            method: 'GET',
-            headers: {
-                'Authorization': `Bearer ${token}`,
-                'X-Access-Token': token
-            }
-        });
-        
-        const data = await res.json();
-        if (data.success) {
-            return data.images || [];
-        } else {
-            alert('Failed to load images: ' + (data.error || 'Unknown error'));
-            return [];
-        }
-    } catch (error) {
-        alert('Error loading images: ' + error.message);
-        return [];
-    }
-}
-
-// Enhanced product upload with Cloudinary integration
-async function uploadProductWithCloudinary() {
-    const name = prompt('Product name:');
-    if (!name) return;
-    
-    const price = prompt('Product price:');
-    if (!price || isNaN(Number(price))) return;
-    
-    const desc = prompt('Product description:') || '';
-    
-    // Option to upload image to Cloudinary first
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = 'image/*';
-    input.onchange = async (e) => {
-        // Cast EventTarget to HTMLInputElement to access files property
-        const target = e.target instanceof HTMLInputElement ? e.target : null;
-        const file = target && target.files ? target.files[0] : null;
-        if (!file) return;
-        
-        // Upload to Cloudinary first
-        const uploadResult = await uploadToCloudinary(file);
-        if (!uploadResult) return;
-        
-        // Use Cloudinary URL for product creation
-        const imageUrl = uploadResult.url;
-        
-        try {
-            const res = await fetch(`${API_URL}/products`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${getAuthToken()}`,
-                    'X-Access-Token': getAuthToken()
-                },
-                body: JSON.stringify({
-                    name: name,
-                    price: parseFloat(price),
-                    desc: desc,
-                    image_url: imageUrl
-                })
-            });
-            
-            const data = await res.json();
-            if (data.success) {
-                alert('Product added successfully with Cloudinary image!');
-                fetchProducts();
-                showManageSection();
-            } else {
-                alert('Failed to add product: ' + (data.error || 'Unknown error'));
-            }
-        } catch (error) {
-            alert('Error adding product: ' + error.message);
-        }
-    };
-    
-    input.click();
- }
- 
- // ===== Cloudinary UI Functions =====
- 
- // Handle Cloudinary file upload
- async function handleCloudinaryUpload(input) {
-     const file = input.files[0];
-     if (!file) return;
-     
-     const result = await uploadToCloudinary(file);
-     if (result) {
-         alert('Image uploaded successfully! URL: ' + result.url);
-         input.value = ''; // Clear the input
-     }
- }
- 
- // Show Cloudinary images in admin dashboard
- async function showCloudinaryImages() {
-     const container = document.getElementById('cloudinaryImages');
-     const listContainer = document.getElementById('cloudinaryImagesList');
-     
-     if (!container || !listContainer) return;
-     
-     container.style.display = 'block';
-     listContainer.innerHTML = '<p style="text-align:center; color:#aaa;">Loading images...</p>';
-     
-     const images = await getCloudinaryImages();
-     
-     if (images.length === 0) {
-         listContainer.innerHTML = '<p style="text-align:center; color:#aaa;">No images found</p>';
-         return;
-     }
-     
-     listContainer.innerHTML = images.map(image => `
-         <div style="background:#333; padding:10px; border-radius:5px; text-align:center;">
-             <img src="${image.url}" alt="${image.public_id}" style="width:100%; height:100px; object-fit:cover; border-radius:3px; margin-bottom:5px;">
-             <p style="font-size:12px; color:#aaa; margin:5px 0; word-break:break-all;">${image.public_id}</p>
-             <button onclick="deleteFromCloudinary('${image.public_id}')" style="background:#f44336; color:white; border:none; padding:5px 8px; border-radius:3px; cursor:pointer; font-size:12px;">
-                 <i class="fas fa-trash"></i> Delete
-             </button>
-         </div>
-     `).join('');
- }

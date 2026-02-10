@@ -30,6 +30,26 @@ const storage = new CloudinaryStorage({
 });
 // ===== CLOUDINARY CONFIGURATION END =====
 
+// Helper function to delete images from Cloudinary
+const deleteCloudinaryImages = async (imageUrls) => {
+    if (!imageUrls || !Array.isArray(imageUrls) || imageUrls.length === 0) return;
+    
+    for (const url of imageUrls) {
+        if (url && url.includes('cloudinary')) {
+            const matches = url.match(/\/([^\/]+)\.[a-z]+$/);
+            if (matches && matches[1]) {
+                const publicId = 'clothes_shop/' + matches[1];
+                try {
+                    await cloudinary.uploader.destroy(publicId);
+                    console.log(`Deleted from Cloudinary: ${publicId}`);
+                } catch (error) {
+                    console.error('Error deleting from Cloudinary:', error);
+                }
+            }
+        }
+    }
+};
+
 function isValidPgUrl(u) {
     if (!u) return false;
     try {
@@ -170,23 +190,35 @@ function requireAdmin(req, res, next) {
     }
     
     // Extract email from token (simple version - in production use JWT)
-    const email = token.replace('Bearer ', '');
+    const email = token.replace('Bearer ', '').trim();
+    
+    if (!email) {
+        return res.status(401).json({ success: false, message: 'Invalid token' });
+    }
     
     if (usePg) {
         pgPool.query("SELECT * FROM users WHERE email = $1 AND role = 'admin'", [email])
             .then(result => {
-                if (result.rows.length === 0) {
+                if (!result || result.rows.length === 0) {
                     return res.status(403).json({ success: false, message: 'Admin access required' });
                 }
                 req.user = result.rows[0];
                 next();
             })
-            .catch(err => res.status(500).json({ error: err.message }));
+            .catch(err => {
+                console.error('Admin auth error:', err);
+                return res.status(500).json({ error: err.message });
+            });
     } else {
         // @ts-ignore
         db.get("SELECT * FROM users WHERE email = ? AND role = 'admin'", [email], (err, row) => {
-            if (err) return res.status(500).json({ error: err.message });
-            if (!row) return res.status(403).json({ success: false, message: 'Admin access required' });
+            if (err) {
+                console.error('Admin auth error:', err);
+                return res.status(500).json({ error: err.message });
+            }
+            if (!row) {
+                return res.status(403).json({ success: false, message: 'Admin access required' });
+            }
             req.user = row;
             next();
         });
@@ -356,129 +388,152 @@ app.post('/api/products', requireAdmin, upload.array('images'), (req, res) => {
             res.json({ success: true, id });
         }).catch(err => res.status(500).json({ error: err.message }));
     } else {
-        // @ts-ignore
-        db.run("INSERT INTO products (name, price, description, category, image_url) VALUES (?, ?, ?, 'suits', ?)", [name, price, desc, imageUrl], function(err) {
-            if (err) return res.status(500).json({ error: err.message });
-            const id = this.lastID;
-            if (Array.isArray(files) && files.length > 0) {
-                // @ts-ignore
-                const stmt = db.prepare("INSERT INTO product_images (product_id, url) VALUES (?, ?)");
-                files.forEach(file => {
-                    stmt.run(id, file.path);
+        // SQLite Implementation with Transaction
+        db.serialize(() => {
+            db.run("BEGIN");
+            // @ts-ignore
+            db.run("INSERT INTO products (name, price, description, category, image_url) VALUES (?, ?, ?, 'suits', ?)", [name, price, desc, imageUrl], function(err) {
+                if (err) {
+                    db.run("ROLLBACK");
+                    return res.status(500).json({ error: err.message });
+                }
+                const id = this.lastID;
+                
+                if (Array.isArray(files) && files.length > 0) {
+                    try {
+                        // @ts-ignore
+                        const stmt = db.prepare("INSERT INTO product_images (product_id, url) VALUES (?, ?)");
+                        files.forEach(file => {
+                            stmt.run(id, file.path);
+                        });
+                        stmt.finalize();
+                    } catch (imgErr) {
+                        db.run("ROLLBACK");
+                        return res.status(500).json({ error: imgErr.message });
+                    }
+                }
+                
+                db.run("COMMIT", (commitErr) => {
+                    if (commitErr) {
+                        return res.status(500).json({ error: commitErr.message });
+                    }
+                    res.json({ success: true, id });
                 });
-                stmt.finalize();
-            }
-            res.json({ success: true, id });
+            });
         });
     }
 });
 
-app.put('/api/products/:id', requireAdmin, upload.array('images'), (req, res) => {
-    const { name, price, desc, image_url } = req.body;
+app.put('/api/products/:id', requireAdmin, upload.array('images'), async (req, res) => {
+    const { name, price, desc } = req.body;
     const id = req.params.id;
     const files = req.files;
     const hasFiles = Array.isArray(files) && files.length > 0;
 
-    // Function to delete Cloudinary images
-    const deleteCloudinaryImages = async (imageUrls) => {
-        for (const url of imageUrls) {
-            if (url && url.includes('cloudinary')) {
-                const matches = url.match(/\/([^\/]+)\.[a-z]+$/);
-                if (matches && matches[1]) {
-                    const publicId = 'clothes_shop/' + matches[1];
-                    try {
-                        await cloudinary.uploader.destroy(publicId);
-                    } catch (error) {
-                        console.error('Error deleting from Cloudinary:', error);
-                    }
-                }
-            }
-        }
-    };
-
     if (usePg) {
-        (async () => {
-            const client = await pgPool.connect();
-            try {
-                await client.query("BEGIN");
-                
-                // Get existing images before updating
-                const imagesResult = await client.query("SELECT url FROM product_images WHERE product_id = $1", [id]);
-                const productResult = await client.query("SELECT image_url FROM products WHERE id = $1", [id]);
-                
-                const oldImageUrls = [
-                    ...imagesResult.rows.map(row => row.url),
-                    ...(productResult.rows[0]?.image_url ? [productResult.rows[0].image_url] : [])
-                ];
+        const client = await pgPool.connect();
+        try {
+            await client.query("BEGIN");
 
-                let sql = "UPDATE products SET name = $1, price = $2, description = $3 WHERE id = $4";
-                let params = [name, price, desc, id];
-                if (hasFiles || image_url) {
-                    const img = hasFiles ? files[0].path : image_url;
-                    sql = "UPDATE products SET name = $1, price = $2, description = $3, image_url = $4 WHERE id = $5";
-                    params = [name, price, desc, img, id];
-                }
-                await client.query(sql, params);
-                
-                if (Array.isArray(files) && files.length > 1) {
-                    for (let i = 1; i < files.length; i++) {
-                        await client.query("INSERT INTO product_images (product_id, url) VALUES ($1, $2)", [id, files[i].path]);
-                    }
-                }
-                
-                // Delete old Cloudinary images if new images are uploaded
-                if (hasFiles && oldImageUrls.length > 0) {
+            const imagesResult = await client.query("SELECT url FROM product_images WHERE product_id = $1", [id]);
+            const productResult = await client.query("SELECT image_url FROM products WHERE id = $1", [id]);
+            
+            const oldImageUrls = [
+                ...imagesResult.rows.map(row => row.url),
+                ...(productResult.rows[0]?.image_url ? [productResult.rows[0].image_url] : [])
+            ];
+
+            let newImageUrl = productResult.rows[0]?.image_url;
+            if (hasFiles) {
+                newImageUrl = files[0].path;
+                if (oldImageUrls.length > 0) {
                     await deleteCloudinaryImages(oldImageUrls);
                 }
-                
-                await client.query("COMMIT");
-                res.json({ success: true });
-            } catch (err) {
-                await client.query("ROLLBACK");
-                res.status(500).json({ error: err.message });
-            } finally {
-                client.release();
+                await client.query("DELETE FROM product_images WHERE product_id = $1", [id]);
             }
-        })();
+
+            const sql = "UPDATE products SET name = $1, price = $2, description = $3, image_url = $4 WHERE id = $5";
+            const params = [name, price, desc, newImageUrl, id];
+            await client.query(sql, params);
+            
+            if (hasFiles && files.length > 1) {
+                for (let i = 1; i < files.length; i++) {
+                    await client.query("INSERT INTO product_images (product_id, url) VALUES ($1, $2)", [id, files[i].path]);
+                }
+            }
+            
+            await client.query("COMMIT");
+            res.json({ success: true });
+        } catch (err) {
+            await client.query("ROLLBACK");
+            res.status(500).json({ error: err.message });
+        } finally {
+            client.release();
+        }
     } else {
-        // Get existing images before updating
+        // SQLite Implementation
         // @ts-ignore
         db.all("SELECT url FROM product_images WHERE product_id = ?", [id], (err, rows) => {
             if (err) return res.status(500).json({ error: err.message });
             
-            const oldImageUrls = rows.map(row => row.url);
+            let oldImageUrls = rows.map(row => row.url);
             
             // @ts-ignore
             db.get("SELECT image_url FROM products WHERE id = ?", [id], (err, row) => {
-                if (!err && row?.image_url) {
+                if (!err && row && row.image_url) {
                     oldImageUrls.push(row.image_url);
                 }
-                
-                let sql = "UPDATE products SET name = ?, price = ?, description = ? WHERE id = ?";
-                let params = [name, price, desc, id];
+
+                let newImageUrl = row ? row.image_url : null;
                 if (hasFiles) {
-                    const imageUrl = files[0].path;
-                    sql = "UPDATE products SET name = ?, price = ?, description = ?, image_url = ? WHERE id = ?";
-                    params = [name, price, desc, imageUrl, id];
+                    newImageUrl = files[0].path;
                 }
+                
                 // @ts-ignore
-                db.run(sql, params, function(err) {
-                    if (err) return res.status(500).json({ error: err.message });
-                    if (Array.isArray(files) && files.length > 1) {
+                db.serialize(() => {
+                    // @ts-ignore
+                    db.run("BEGIN");
+                    
+                    if (hasFiles) {
                         // @ts-ignore
-                        const stmt = db.prepare("INSERT INTO product_images (product_id, url) VALUES (?, ?)");
-                        for (let i = 1; i < files.length; i++) {
-                            stmt.run(id, files[i].path);
+                        db.run("DELETE FROM product_images WHERE product_id = ?", [id]);
+                    }
+                    
+                    const sql = "UPDATE products SET name = ?, price = ?, description = ?, image_url = ? WHERE id = ?";
+                    const params = [name, price, desc, newImageUrl, id];
+                    
+                    // @ts-ignore
+                    db.run(sql, params, async function(err) {
+                        if (err) {
+                            // @ts-ignore
+                            db.run("ROLLBACK");
+                            return res.status(500).json({ error: err.message });
                         }
-                        stmt.finalize();
-                    }
-                    
-                    // Delete old Cloudinary images if new images are uploaded
-                    if (hasFiles && oldImageUrls.length > 0) {
-                        deleteCloudinaryImages(oldImageUrls);
-                    }
-                    
-                    res.json({ success: true });
+                        
+                        if (hasFiles) {
+                            if (files.length > 1) {
+                                // @ts-ignore
+                                const stmt = db.prepare("INSERT INTO product_images (product_id, url) VALUES (?, ?)");
+                                for (let i = 1; i < files.length; i++) {
+                                    stmt.run(id, files[i].path);
+                                }
+                                stmt.finalize();
+                            }
+                        }
+                        
+                        // @ts-ignore
+                        db.run("COMMIT", async (commitErr) => {
+                             if (commitErr) {
+                                 return res.status(500).json({ error: commitErr.message });
+                             }
+                             
+                             if (hasFiles && oldImageUrls.length > 0) {
+                                 await deleteCloudinaryImages(oldImageUrls);
+                             }
+                             
+                             res.json({ success: true });
+                        });
+                    });
                 });
             });
         });
@@ -487,23 +542,6 @@ app.put('/api/products/:id', requireAdmin, upload.array('images'), (req, res) =>
 
 app.delete('/api/products/:id', requireAdmin, (req, res) => {
     const id = req.params.id;
-    
-    // Function to delete Cloudinary images
-    const deleteCloudinaryImages = async (imageUrls) => {
-        for (const url of imageUrls) {
-            if (url && url.includes('cloudinary')) {
-                const matches = url.match(/\/([^\/]+)\.[a-z]+$/);
-                if (matches && matches[1]) {
-                    const publicId = 'clothes_shop/' + matches[1];
-                    try {
-                        await cloudinary.uploader.destroy(publicId);
-                    } catch (error) {
-                        console.error('Error deleting from Cloudinary:', error);
-                    }
-                }
-            }
-        }
-    };
     
     if (usePg) {
         (async () => {
@@ -527,12 +565,13 @@ app.delete('/api/products/:id', requireAdmin, (req, res) => {
                     return res.status(400).json({ error: "Cannot delete product with existing order items" });
                 }
                 
-                // Delete from Cloudinary first
-                await deleteCloudinaryImages(imageUrls);
-                
                 await client.query("DELETE FROM product_images WHERE product_id = $1", [id]);
                 await client.query("DELETE FROM products WHERE id = $1", [id]);
                 await client.query("COMMIT");
+                
+                // Delete from Cloudinary after commit
+                await deleteCloudinaryImages(imageUrls);
+                
                 res.json({ success: true });
             } catch (err) {
                 await client.query("ROLLBACK");
@@ -577,11 +616,13 @@ app.delete('/api/products/:id', requireAdmin, (req, res) => {
                                 return res.status(500).json({ error: err.message });
                             }
                             // @ts-ignore
-                            db.run("COMMIT");
-                            
-                            // Delete from Cloudinary after database deletion
-                            await deleteCloudinaryImages(imageUrls);
-                            res.json({ success: true });
+                            db.run("COMMIT", async (commitErr) => {
+                                if (commitErr) return res.status(500).json({ error: commitErr.message });
+                                
+                                // Delete from Cloudinary after database deletion
+                                await deleteCloudinaryImages(imageUrls);
+                                res.json({ success: true });
+                            });
                         });
                     });
                 });
