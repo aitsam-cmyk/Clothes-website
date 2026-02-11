@@ -444,10 +444,12 @@ app.put('/api/products/:id', requireAdmin, upload.array('images'), async (req, r
             ];
 
             let newImageUrl = productResult.rows[0]?.image_url;
+            let imagesToDelete = [];
+            
             if (hasFiles) {
                 newImageUrl = files[0].path;
                 if (oldImageUrls.length > 0) {
-                    await deleteCloudinaryImages(oldImageUrls);
+                    imagesToDelete = oldImageUrls;
                 }
                 await client.query("DELETE FROM product_images WHERE product_id = $1", [id]);
             }
@@ -463,9 +465,22 @@ app.put('/api/products/:id', requireAdmin, upload.array('images'), async (req, r
             }
             
             await client.query("COMMIT");
+            
+            // Delete old images from Cloudinary ONLY after successful commit
+            if (imagesToDelete.length > 0) {
+                await deleteCloudinaryImages(imagesToDelete);
+            }
+            
             res.json({ success: true });
         } catch (err) {
             await client.query("ROLLBACK");
+            
+            // If DB update failed, delete the NEW images we just uploaded to avoid orphans
+            if (hasFiles) {
+                const newUploadedUrls = files.map(f => f.path);
+                await deleteCloudinaryImages(newUploadedUrls);
+            }
+            
             res.status(500).json({ error: err.message });
         } finally {
             client.release();
@@ -873,7 +888,7 @@ app.get('/api/health', async (req, res) => {
 app.listen(PORT, () => console.log(`Server: http://localhost:${PORT}`));
  
 // Extra Order Endpoints
-app.delete('/api/orders/:id', async (req, res) => {
+app.delete('/api/orders/:id', requireAdmin, async (req, res) => {
     const id = req.params.id;
     if (usePg) {
         pgPool.query("DELETE FROM orders WHERE id = $1", [id])
@@ -903,7 +918,7 @@ app.delete('/api/orders/:id', async (req, res) => {
     }
 });
 
-app.put('/api/orders/:id/status', (req, res) => {
+app.put('/api/orders/:id/status', requireAdmin, (req, res) => {
     const id = req.params.id;
     const status = (req.body && req.body.status) || null;
     if (!status) return res.status(400).json({ error: 'Missing status' });
@@ -949,4 +964,13 @@ app.get('/api/reviews/:productId', (req, res) => {
             res.json(rows || []);
         });
     }
+});
+
+// Global Error Handler
+app.use((err, req, res, next) => {
+    console.error('Unhandled Error:', err);
+    res.status(500).json({ 
+        error: err.message || 'Internal Server Error',
+        stack: process.env.NODE_ENV === 'development' ? err.stack : undefined
+    });
 });

@@ -1,7 +1,7 @@
 // ===== Configuration =====
 const LOCAL_API = 'http://localhost:3000/api';
 const REMOTE_API = 'https://aitsam916-clothes-backend.hf.space/api'; // Update this with your new Hugging Face URL if it changes
-const API_URL = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') ? LOCAL_API : REMOTE_API;
+const API_URL = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || window.location.protocol === 'file:') ? LOCAL_API : REMOTE_API;
 
 let products = [];
 let cart = [];
@@ -452,7 +452,19 @@ async function submitNewSuit() {
             },
             body: fd 
         });
-        const data = await res.json();
+        
+        const text = await res.text();
+        let data;
+        try {
+            data = JSON.parse(text);
+        } catch (e) {
+            throw new Error('Server returned invalid JSON: ' + text.substring(0, 100));
+        }
+
+        if (!res.ok) {
+            throw new Error(data.error || data.message || `Server Error (${res.status})`);
+        }
+
         if (data.success) {
             alert('Product added with Cloudinary images');
             nameEl.value = '';
@@ -463,10 +475,11 @@ async function submitNewSuit() {
             showSection('manageSection');
             showManageSection();
         } else {
-            alert(data.error || 'Add failed');
+            throw new Error(data.error || 'Add failed');
         }
     } catch (e) {
-        alert('Server error');
+        console.error('Add Error:', e);
+        alert('Error: ' + e.message);
     }
 }
 
@@ -531,7 +544,7 @@ async function submitEditSuit() {
         alert('Enter valid data');
         return;
     }
-    let res;
+    
     try {
         const fd = new FormData();
         fd.append('name', name);
@@ -545,7 +558,7 @@ async function submitEditSuit() {
             }
         }
 
-        res = await fetch(`${API_URL}/products/${id}`, { 
+        const res = await fetch(`${API_URL}/products/${id}`, { 
             method: 'PUT', 
             headers: {
                 'Authorization': `Bearer ${getAuthToken()}`,
@@ -553,17 +566,30 @@ async function submitEditSuit() {
             },
             body: fd 
         });
-        const data = await res.json();
+        
+        const text = await res.text();
+        let data;
+        try {
+            data = JSON.parse(text);
+        } catch (e) {
+            throw new Error('Server returned invalid JSON: ' + text.substring(0, 100));
+        }
+
+        if (!res.ok) {
+            throw new Error(data.error || data.message || `Server Error (${res.status})`);
+        }
+
         if (data.success) {
-            alert('Updated');
+            alert('Updated successfully');
             await fetchProducts();
             showManageSection();
             showSection('manageSection');
         } else {
-            alert(data.error || 'Update failed');
+            throw new Error(data.error || 'Update failed');
         }
     } catch (e) {
-        alert('Server error');
+        console.error('Edit Error:', e);
+        alert('Error: ' + e.message);
     }
 }
 
@@ -574,17 +600,36 @@ async function deleteSuit(id) {
     }
     if (!confirm('Delete this product?')) return;
     try {
-        const res = await fetch(`${API_URL}/products/${id}`, { method: 'DELETE' });
-        const data = await res.json();
+        const res = await fetch(`${API_URL}/products/${id}`, { 
+            method: 'DELETE',
+            headers: {
+                'Authorization': `Bearer ${getAuthToken()}`,
+                'X-Access-Token': getAuthToken()
+            }
+        });
+        
+        const text = await res.text();
+        let data;
+        try {
+            data = JSON.parse(text);
+        } catch (e) {
+            throw new Error('Server returned invalid JSON: ' + text.substring(0, 100));
+        }
+
+        if (!res.ok) {
+             throw new Error(data.error || data.message || `Server Error (${res.status})`);
+        }
+
         if (data.success) {
-            alert('Deleted');
+            alert('Deleted successfully');
             await fetchProducts();
             showManageSection();
         } else {
-            alert(data.error || 'Delete failed');
+            throw new Error(data.error || 'Delete failed');
         }
     } catch (e) {
-        alert('Server error');
+        console.error('Delete Error:', e);
+        alert('Error: ' + e.message);
     }
 }
 
@@ -644,16 +689,31 @@ async function deleteOrder(id) {
     }
     if (!confirm('Delete this order?')) return;
     try {
-        const res = await fetch(`${API_URL}/orders/${id}`, { method: 'DELETE' });
-        const data = await res.json();
+        const res = await fetch(`${API_URL}/orders/${id}`, { 
+            method: 'DELETE',
+            headers: {
+                'Authorization': `Bearer ${getAuthToken()}`,
+                'X-Access-Token': getAuthToken()
+            }
+        });
+        const text = await res.text();
+        let data;
+        try {
+            data = JSON.parse(text);
+        } catch (e) {
+            throw new Error('Invalid JSON: ' + text.substring(0, 50));
+        }
+
+        if (!res.ok) throw new Error(data.error || 'Server Error');
+
         if (data.success) {
             alert('Order deleted');
             showAdminDashboard();
         } else {
-            alert(data.error || 'Delete failed');
+            throw new Error(data.error || 'Delete failed');
         }
     } catch (e) {
-        alert('Server error');
+        alert('Error: ' + e.message);
     }
 }
 
@@ -665,17 +725,30 @@ async function markOrderReceived(id) {
     try {
         const res = await fetch(`${API_URL}/orders/${id}/status`, {
             method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${getAuthToken()}`,
+                'X-Access-Token': getAuthToken()
+            },
             body: JSON.stringify({ status: 'Received' })
         });
-        const data = await res.json();
+        const text = await res.text();
+        let data;
+        try {
+            data = JSON.parse(text);
+        } catch (e) {
+            throw new Error('Invalid JSON: ' + text.substring(0, 50));
+        }
+
+        if (!res.ok) throw new Error(data.error || 'Server Error');
+
         if (data.success) {
             showAdminDashboard();
         } else {
-            alert(data.error || 'Update failed');
+            throw new Error(data.error || 'Update failed');
         }
     } catch (e) {
-        alert('Server error');
+        alert('Error: ' + e.message);
     }
 }
 
