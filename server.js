@@ -134,7 +134,18 @@ if (!fs.existsSync(uploadDir)) {
     fs.mkdirSync(uploadDir);
 }
 
-app.use(cors());
+app.use(cors({
+    origin: '*',
+    methods: ['GET','POST','PUT','PATCH','DELETE','OPTIONS'],
+    allowedHeaders: ['Content-Type','Authorization','X-Access-Token'],
+    credentials: false
+}));
+app.options('*', cors({
+    origin: '*',
+    methods: ['GET','POST','PUT','PATCH','DELETE','OPTIONS'],
+    allowedHeaders: ['Content-Type','Authorization','X-Access-Token'],
+    credentials: false
+}));
 app.use(bodyParser.json());
 app.use(express.static(__dirname));
 app.use('/uploads', express.static(uploadDir));
